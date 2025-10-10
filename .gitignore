@@ -1,0 +1,12 @@
+# Environment file
+.env
+
+# Local virtual environment
+.venv/
+
+# VS Code workspace settings
+.vscode/
+# Python cache folders (anywhere in project)
+__pycache__/
+*.pyc
+*.pyo
