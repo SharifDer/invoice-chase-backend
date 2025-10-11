@@ -3,7 +3,7 @@
 
 # Local virtual environment
 .venv/
-
+keys/
 # VS Code workspace settings
 .vscode/
 # Python cache folders (anywhere in project)
