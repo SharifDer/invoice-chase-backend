@@ -7,7 +7,8 @@ from auth import get_current_user
 from schemas.requests import ClientCreateRequest, ClientUpdateRequest
 from schemas.responses import (ClientResponse, ClientListResponse, 
                                 BaseResponse, ClientTransaction,
-                               ClientSummaryResponse, ClientReportResponse)
+                               ClientSummaryResponse, ClientReportResponse,
+                               ClientSettingsResponse)
 from logger import get_logger
 from typing import List
 logger = get_logger(__name__)
@@ -297,9 +298,7 @@ async def update_client(
         update_fields.append("company = ?")
         params.append(request.company)
     
-    if not update_fields:
-        # No fields to update, return existing client
-        return ClientResponse(**existing_client)
+    
     
     update_fields.append("updated_at = ?")
     params.append(datetime.utcnow())
@@ -312,17 +311,95 @@ async def update_client(
     """
     await Database.execute(query, tuple(params))
     
+
+    settings_fields = {
+        "reminder_type": request.communication_method,
+        "transaction_notification_type": request.communication_method,
+        "send_transaction_notifications": request.trans_notification,
+        "send_automated_reminders": request.payment_reminders,
+        "reminder_frequency_days": request.reminds_every_n_days,
+        "reminder_minimum_balance": request.min_balance_to_remind
+    }
+
+    existing_settings = await Database.fetch_one(
+        "SELECT * FROM client_settings WHERE client_id = ? AND user_id = ?",
+        (client_id, user_id)
+    )
+
+    if existing_settings:
+        set_clauses = []
+        values = []
+        for col, val in settings_fields.items():
+            if val is not None:
+                set_clauses.append(f"{col} = ?")
+                values.append(val)
+
+        if set_clauses:
+            set_clauses.append("updated_at = ?")
+            values.append(datetime.utcnow())
+            values.extend([client_id, user_id])
+
+            await Database.execute(
+                f"""
+                UPDATE client_settings
+                SET {', '.join(set_clauses)}
+                WHERE client_id = ? AND user_id = ?
+                """,
+                tuple(values)
+            )
+
+    else:
+        provided = {k: v for k, v in settings_fields.items() if v is not None}
+        if provided:
+            cols = ", ".join(provided.keys())
+            placeholders = ", ".join(["?"] * len(provided))
+            values = list(provided.values())
+
+            await Database.execute(
+                f"""
+                INSERT INTO client_settings (user_id, client_id, {cols})
+                VALUES (?, ?, {placeholders})
+                """,
+                (user_id, client_id, *values)
+            )
+    # --------------------------------------------
+
     # Get updated client
     updated_client = await Database.fetch_one(
         "SELECT * FROM clients WHERE id = ? AND user_id = ?",
         (client_id, user_id)
     )
     
-    logger.info(f"Client updated: {client_id} for user {user_id}")
-    
+    logger.info(f"Client and settings updated: {client_id} for user {user_id}")
+
     return ClientResponse(**updated_client)
+  
+    
+    # return ClientResponse(**updated_client)
 
+@router.get("/get_client_settings/{client_id}", response_model=ClientSettingsResponse)
+async def get_client_settings(client_id : int ,
+                            #   current_user: dict = Depends(get_current_user)
+                              ):
+    # user_id = current_user['user_id']
+    user_id = 1
+    client_settings = await Database.fetch_one("SELECT * FROM client_settings WHERE client_id = ? AND user_id = ?",
+        (client_id, user_id))
+    if not client_settings :
+        client_settings = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?",
+        (user_id,))
+    if not client_settings:
+        # No settings found in either table
+        raise HTTPException(status_code=404, detail="Settings not found for this client or user")
 
+    print("client settings", client_settings)
+    return ClientSettingsResponse(
+        communicationMethod=client_settings["reminder_type"],
+        transactionNotificationEnabled=client_settings["send_transaction_notifications"],
+        reminderEnabled=client_settings["send_automated_reminders"],
+        reminderIntervalDays=client_settings["reminder_frequency_days"],
+        reminderMinimumAmount=client_settings["reminder_minimum_balance"]
+    )
 
 @router.delete("/delete_client/{client_id}", response_model=BaseResponse)
 async def delete_client(client_id: int,
