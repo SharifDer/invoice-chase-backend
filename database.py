@@ -86,18 +86,28 @@ class Database:
             email TEXT UNIQUE NOT NULL,
             firebase_uid TEXT UNIQUE,
             name TEXT NOT NULL,
-            business_name TEXT,
-            phone TEXT,
-            address TEXT,
             email_verified BOOLEAN DEFAULT FALSE,
-            website TEXT,
-            logo_url TEXT,
             stripe_account_id TEXT UNIQUE,
             currency TEXT NOT NULL DEFAULT 'USD',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
             """,
+            """
+            CREATE TABLE IF NOT EXISTS business_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                business_name TEXT NOT NULL,
+                business_email TEXT,
+                phone TEXT,
+                address TEXT,
+                website TEXT,
+                logo_url TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            );
+                """
             
 
             """
@@ -200,7 +210,7 @@ class Database:
         async with cls.connection() as conn:
             # Create tables
             for table_sql in tables:
-                await conn.execute(table_sql)
+                await conn.executescript(table_sql)
                 logger.debug("Created table")
             
             await conn.commit()
