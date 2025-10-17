@@ -5,7 +5,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 from database import Database
-from routes import auth, dashboard, clients, analytics, settings, transactions
+from routes import auth, dashboard, clients, analytics, settings, transactions, reminders
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +45,7 @@ app.include_router(transactions.router, prefix="/invoices", tags=["Invoices"])
 app.include_router(clients.router, prefix="/clients", tags=["Clients"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
-
+app.include_router(settings.router, prefix="/reminders", tags=["Reminders"])
 
 @app.get("/")
 async def root():
