@@ -10,12 +10,6 @@ class BaseResponse(BaseModel):
     message: Optional[str] = None
 
 
-class ErrorResponse(BaseModel):
-    success: bool = False
-    detail: str
-    message: Optional[str] = None
-
-
 # Authentication Responses
 class UserResponse(BaseModel):
     id: int
@@ -27,12 +21,6 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseResponse):
     user: UserResponse
  
-
-
-class RefreshTokenResponse(BaseResponse):
-    access_token: str
-    token_type: str = "bearer"
-
 
 # Client Responses
 class ClientResponse(BaseModel):
@@ -73,7 +61,12 @@ class ClientTransaction(BaseModel):
     amount: float
     date: date
     transaction_number: Optional[str]
-
+class BusinessProfile(BaseModel):
+    business_name: Optional[str] = None
+    business_logo: Optional[str] = None
+    business_phone: Optional[str] = None
+    business_website: Optional[str] = None
+    business_address: Optional[str] = None
 class ClientReportResponse(BaseModel):
     id: int
     name: str
@@ -90,7 +83,7 @@ class ClientReportResponse(BaseModel):
     limit: int
     total_transactions: int
     total_pages: int
-
+    business_profile: Optional[BusinessProfile] = None 
 class ClientSettingsResponse(BaseModel):
     communicationMethod : str
     transactionNotificationEnabled : bool
@@ -102,24 +95,10 @@ class InvoiceResponse(BaseModel):
   message : str
   status : str
 
-class TransactionUpdateResponse(BaseModel):
-    id : int
-    trans_number : str
-    client_id : str
-    client_name : str
-    amount : float
-    type : str
 
 class TransCreationResponse(BaseModel):
     message : str
     status : str
-
-class InvoiceListResponse(BaseResponse):
-    invoices: List[InvoiceResponse]
-    total: int
-    page: int
-    limit: int
-    total_pages: int
 
 class TransactionDetailsResponse(BaseModel):
     client_company : str
@@ -132,7 +111,6 @@ class TransactionResponse(BaseModel):
     client_name: str
     type: str               # "invoice" | "payment"
     amount: float
-    status: str
     created_date: date
     description: Optional[str]
 
@@ -147,14 +125,6 @@ class TransactionListResponse(BaseModel):
 
 
 # Dashboard Responses
-class MonthlyCollectionData(BaseModel):
-    month: str
-    amount: Decimal
-
-class MonthlyCollection(BaseModel):
-    month: str
-    total_amount: Decimal
-
 
 class TransactionSummary(BaseModel):
     id: int
@@ -163,16 +133,25 @@ class TransactionSummary(BaseModel):
     amount: Decimal
     client_name: str
 
+class TodayMomentum(BaseModel):
+    todayInvoices: int
+    todayPayments: int
+    todayInvoicesAmount: float
+    todayPaymentsAmount: float
+    dailyAvgInvoices: float
+    dailyAvgPayments: float
+    thisWeekInvoices: int
+    thisWeekPayments: int
+    lastWeekInvoices: int
+    lastWeekPayments: int
+
 class DashboardStatsResponse(BaseModel):
     total_invoices: int
     invoiced_amount: float
     num_of_receipts: int
     total_receipts_amount: float
-    monthly_collections: List[MonthlyCollection]
+    todayMomentum: TodayMomentum
     recent_transactions: List[TransactionSummary]
-
-# Analytics Responses
-
 
 
 # Analytics Response Models
@@ -246,14 +225,6 @@ class NotificationSettings(BaseModel):
     reminder_frequency_days: int
     reminder_minimum_balance: float
     send_transaction_notifications: bool
-    reminder_template: Optional[str] = None
-    notification_template: Optional[str] = None
-
-# class SettingsResponse(BaseResponse):
-#     user_id: int
-#     email : str
-#     company: CompanySettingsResponse
-
 
 
 # Health Check Response
