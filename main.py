@@ -45,7 +45,7 @@ app.include_router(transactions.router, prefix="/invoices", tags=["Invoices"])
 app.include_router(clients.router, prefix="/clients", tags=["Clients"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
-app.include_router(settings.router, prefix="/reminders", tags=["Reminders"])
+app.include_router(reminders.router, prefix="/reminders", tags=["Reminders"])
 
 @app.get("/")
 async def root():
