@@ -226,7 +226,11 @@ class NotificationSettings(BaseModel):
     reminder_minimum_balance: float
     send_transaction_notifications: bool
 
-
+### Reminders responses 
+class TestEmailReminderRes(BaseModel):
+    status : str 
+    message : str
+    sent_to : str
 # Health Check Response
 class HealthCheckResponse(BaseModel):
     status: str
