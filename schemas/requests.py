@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Dict, Any, Literal
+from typing import Optional,Literal, List
 from datetime import date
 from decimal import Decimal
 from fastapi import Query
@@ -23,7 +23,9 @@ class GoogleAuthRequest(BaseModel):
     firebase_token: str
     email: Optional[EmailStr] = None
     name: str = Field(..., min_length=1)
-
+class ReqUserLogin(BaseModel):
+    email: str
+    password: str
 # ======================
 # Client Requests
 # ======================
@@ -73,40 +75,12 @@ class TransactionUpdateRequest(BaseModel):
     created_at : Optional[date] = None
     # status: Optional[str] = Field(None, pattern="^(Draft|Pending|Paid|Overdue)$")
 
-class InvoiceFilterRequest(BaseModel):
-    status: Optional[str] = None
-    client_id: Optional[int] = None
-    due_date_from: Optional[date] = None
-    due_date_to: Optional[date] = None
-    page: int = Field(1, ge=1)
-    limit: int = Field(10, ge=1, le=100)
-
 # ======================
-# Settings Requests
+# Reminders Requests
 # ======================
 
-class CompanySettingsRequest(BaseModel):
-    company_logo_url: Optional[str] = None
-    reminder_settings: Optional[Dict[str, Any]] = None
-    payment_settings: Optional[Dict[str, Any]] = None
+class EmailSendReq(BaseModel):
+    type : str        #balance reminder or transaction notifcation creation
 
-class ReminderSettingsRequest(BaseModel):
-    enabled: bool = True
-    gentle_reminder_days: int = Field(3, ge=1, le=30)
-    firm_reminder_days: int = Field(7, ge=1, le=30)
-    final_reminder_days: int = Field(14, ge=1, le=60)
-    email_template: Optional[str] = None
-    sms_enabled: bool = False
-
-class PaymentSettingsRequest(BaseModel):
-    stripe_enabled: bool = False
-    stripe_publishable_key: Optional[str] = None
-    paypal_enabled: bool = False
-    paypal_client_id: Optional[str] = None
-    default_currency: str = Field("USD", min_length=3, max_length=3)
-
-
-
-class ReqUserLogin(BaseModel):
-    email: str
-    password: str
+class UrgentReminderReq(BaseModel):
+    client_ids: List[int]  
