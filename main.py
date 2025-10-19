@@ -7,15 +7,26 @@ from contextlib import asynccontextmanager
 from database import Database
 from routes import auth, dashboard, clients, analytics, settings, transactions, reminders
 from logger import get_logger
+from routes.reminders import send_automated_reminders
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = get_logger(__name__)
 
-
+scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Invoice Chase API...")
     await Database.initialize()
+    scheduler.add_job(
+        send_automated_reminders,
+        trigger=IntervalTrigger(minutes=20),
+        kwargs={"grace_minutes": 30},
+        id="automated_reminders",
+        replace_existing=True,
+    )
+    scheduler.start()
     yield
     # Shutdown
     logger.info("Shutting down Invoice Chase API...")
@@ -76,6 +87,7 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content={"detail": "Internal server error", "message": str(exc)}
     )
+
 
 
 if __name__ == "__main__":
