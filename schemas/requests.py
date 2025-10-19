@@ -56,7 +56,6 @@ class InvoiceCreateRequest(BaseModel):
     type : str = Literal['payment', 'invoice']
     amount: Decimal = Field(..., gt=0)
     description: Optional[str] = None
-    status: Optional[str] = Field("Draft", pattern="^(Draft|Pending|Paid|Overdue)$")
 
 
 class InvoiceCreateRequestNewClient(BaseModel):
