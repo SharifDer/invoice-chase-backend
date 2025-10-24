@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from datetime import datetime
 from decimal import Decimal
 import math
@@ -6,11 +6,15 @@ from database import Database
 from auth import get_current_user
 from schemas.requests import ClientCreateRequest, ClientUpdateRequest
 from schemas.responses import (ClientResponse, ClientListResponse, 
-                                BaseResponse, ClientTransaction,
+                                BaseResponse,
                                ClientSummaryResponse, ClientReportResponse,
                                ClientSettingsResponse)
 from logger import get_logger
-from typing import List
+import uuid
+from datetime import datetime, timedelta
+from .utils import get_client_report_data
+
+from .dbUtils import (check_existing_client, insert_client_record,apply_custom_client_settings)
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -87,103 +91,22 @@ async def get_client_report(
     limit: int = Query(10, ge=1, le=100),
     # current_user: dict = Depends(get_current_user)
 ):
-    """Get detailed report of a client with paginated transactions"""
-    try:
-        # user_id = current_user["user_id"]
-        user_id = 1
+    """Get detailed report of a client with paginated transactions and business profile"""
 
-        # --- 1. Fetch client info and financial totals ---
-        query = """
-        SELECT
-            c.id,
-            c.name,
-            c.email,
-            c.phone,
-            c.company,
-            c.created_at,
-            c.updated_at,
-            COALESCE(SUM(CASE WHEN t.type = 'invoice' THEN t.amount END), 0) AS total_invoiced,
-            COALESCE(SUM(CASE WHEN t.type = 'payment' THEN t.amount END), 0) AS total_paid
-        FROM clients c
-        LEFT JOIN transactions t ON c.id = t.client_id
-        WHERE c.id = ? AND c.user_id = ?
-        GROUP BY c.id
-        """
-        client_row = await Database.fetch_one(query, (client_id, user_id))
-        if not client_row:
-            raise HTTPException(status_code=404, detail="Client not found")
+    # user_id = current_user["user_id"]
+    user_id = 1
+    return await get_client_report_data(user_id, client_id, page, limit)
 
-        # --- 2. Pagination calculations ---
-        count_query = """
-        SELECT COUNT(*) AS total
-        FROM transactions
-        WHERE client_id = ? AND user_id = ?
-        """
-        count_result = await Database.fetch_one(count_query, (client_id, user_id))
-        total_transactions = count_result["total"] if count_result else 0
-        total_pages = math.ceil(total_transactions / limit) if total_transactions > 0 else 0
-        offset = (page - 1) * limit
-
-        # --- 3. Fetch paginated transactions ---
-        trans_query = """
-        SELECT id, type, description, amount, created_date AS date, transaction_number
-        FROM transactions
-        WHERE client_id = ? AND user_id = ?
-        ORDER BY created_date DESC
-        LIMIT ? OFFSET ?
-        """
-        trans_rows = await Database.fetch_all(trans_query, (client_id, user_id, limit, offset))
-        transactions = [
-            ClientTransaction(
-                id=row["id"],
-                type=row["type"],
-                description=row.get("description"),
-                amount=float(row["amount"]),
-                date=row["date"],
-                transaction_number=row.get("transaction_number")
-            )
-            for row in trans_rows
-        ]
-
-        # --- 4. Return structured response ---
-        total_invoiced = float(client_row["total_invoiced"])
-        total_paid = float(client_row["total_paid"])
-        outstanding = total_invoiced - total_paid
-
-        return ClientReportResponse(
-            id=client_row["id"],
-            name=client_row["name"],
-            email=client_row["email"],
-            phone=client_row["phone"],
-            company=client_row["company"],
-            created_at=client_row["created_at"],
-            updated_at=client_row["updated_at"],
-            total_invoiced=total_invoiced,
-            total_paid=total_paid,
-            outstanding=outstanding,
-            transactions=transactions,
-            page=page,
-            limit=limit,
-            total_transactions=total_transactions,
-            total_pages=total_pages
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get client report error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve client report"
-        )
 
 
 @router.get("/get_client/{client_id}", response_model=ClientResponse)
-async def get_client(client_id: int, current_user: dict = Depends(get_current_user)):
+async def get_client(client_id: int,
+                    #   current_user: dict = Depends(get_current_user)
+                    ):
     """Get a specific client by ID"""
     try:
-        user_id = current_user['id']
-        
+        # user_id = current_user['id']
+        user_id = 1
         query = "SELECT * FROM clients WHERE id = ? AND user_id = ?"
         client = await Database.fetch_one(query, (client_id, user_id))
         
@@ -214,34 +137,18 @@ async def create_client(
     # user_id = current_user['user_id']
     user_id = 1
     # Check if client with same email already exists for this user
-    if request.email:
-        existing_client = await Database.fetch_one(
-            "SELECT id FROM clients WHERE user_id = ? AND email = ?",
-            (user_id, request.email)
-        )
-        if existing_client:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Client with this email already exists"
-            )
-    
-    query = """
-    INSERT INTO clients (user_id, name, email, phone, company)
-    VALUES (?, ?, ?, ?, ?)
-    """
-    await Database.execute(query, (
+    await check_existing_client(user_id, request.email)
+    created_client = await insert_client_record(
         user_id,
         request.name,
         request.email,
         request.phone,
         request.company
-    ))
-    
-    # Get the created client
-    created_client = await Database.fetch_one(
-        "SELECT * FROM clients WHERE user_id = ? AND name = ? ORDER BY created_at DESC LIMIT 1",
-        (user_id, request.name)
     )
+    client_id = created_client["id"]
+    # If user unchecked "Apply default settings", insert custom notification settings
+    if not request.apply_user_settings and request.notification_settings:
+        await apply_custom_client_settings(user_id, client_id, request.notification_settings)
     
     logger.info(f"Client created: {request.name} for user {user_id}")
     
@@ -313,8 +220,7 @@ async def update_client(
     
 
     settings_fields = {
-        "reminder_type": request.communication_method,
-        "transaction_notification_type": request.communication_method,
+        "communication_method": request.communication_method,
         "send_transaction_notifications": request.trans_notification,
         "send_automated_reminders": request.payment_reminders,
         "reminder_frequency_days": request.reminds_every_n_days,
@@ -334,6 +240,12 @@ async def update_client(
                 set_clauses.append(f"{col} = ?")
                 values.append(val)
 
+        # Add this to update reminder_next_date dynamically
+        set_clauses.append(
+            "reminder_next_date = strftime('%Y-%m-%d %H:00:00', DATETIME('now', '+' || ? || ' days'))"
+        )
+        values.append(settings_fields["reminder_frequency_days"])
+
         if set_clauses:
             set_clauses.append("updated_at = ?")
             values.append(datetime.utcnow())
@@ -348,12 +260,14 @@ async def update_client(
                 tuple(values)
             )
 
+
     else:
         provided = {k: v for k, v in settings_fields.items() if v is not None}
         if provided:
-            cols = ", ".join(provided.keys())
-            placeholders = ", ".join(["?"] * len(provided))
+            cols = ", ".join(provided.keys()) + ", reminder_next_date"
+            placeholders = ", ".join(["?"] * len(provided)) + ", strftime('%Y-%m-%d %H:00:00', DATETIME('now', '+' || ? || ' days'))"
             values = list(provided.values())
+            values.append(settings_fields["reminder_frequency_days"])  # for the ? in strftime
 
             await Database.execute(
                 f"""
@@ -362,6 +276,7 @@ async def update_client(
                 """,
                 (user_id, client_id, *values)
             )
+
     # --------------------------------------------
 
     # Get updated client
@@ -394,7 +309,7 @@ async def get_client_settings(client_id : int ,
 
     print("client settings", client_settings)
     return ClientSettingsResponse(
-        communicationMethod=client_settings["reminder_type"],
+        communicationMethod=client_settings["communication_method"],
         transactionNotificationEnabled=client_settings["send_transaction_notifications"],
         reminderEnabled=client_settings["send_automated_reminders"],
         reminderIntervalDays=client_settings["reminder_frequency_days"],
@@ -428,7 +343,7 @@ async def delete_client(client_id: int,
     if invoices_count['count'] > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete client with {invoices_count['count']} associated invoices. Delete invoices first."
+            detail=f"Cannot delete client with {invoices_count['count']} associated Transactions. Delete Transactions first."
         )
     
     # Delete client
@@ -462,3 +377,55 @@ async def search_clients(q: str,
     like_q = f"%{q}%"
     clients = await Database.fetch_all(query, (user_id, like_q, like_q, like_q))
     return {"clients": clients}
+
+
+
+@router.post("/clients/{client_id}/share")
+async def generate_client_report_token(client_id: int,
+                                       request : Request
+                                    #    current_user: dict = Depends(get_current_user)
+                                       ):
+    # user_id = current_user['user_id']
+    user_id = 1  # TODO: from current_user["user_id"]
+    token = str(uuid.uuid4())
+    expires_at = datetime.utcnow() + timedelta(days=7)  # expires in 7 days
+
+    insert_query = """
+    INSERT INTO client_report_tokens (token, user_id, client_id, expires_at, is_active)
+    VALUES (?, ?, ?, ?, 1)
+    """
+    await Database.execute(insert_query, (token, user_id, client_id, expires_at))
+    base_url = str(request.base_url)
+    share_url = f"{base_url}clients/report/view?token={token}"
+    return {"success": True, "share_url": share_url, "expires_at": expires_at}
+
+
+@router.get("/report/view", response_model=ClientReportResponse)
+async def view_shared_client_report(token: str):
+    # 1. Validate token
+    token_query = """
+    SELECT user_id, client_id, expires_at, is_active
+    FROM client_report_tokens
+    WHERE token = ?
+    """
+    token_row = await Database.fetch_one(token_query, (token,))
+    if not token_row or not token_row["is_active"]:
+        raise HTTPException(status_code=400, detail="Invalid or inactive token")
+
+    expires_at = datetime.fromisoformat(token_row["expires_at"])
+    if datetime.utcnow() > expires_at:
+        raise HTTPException(status_code=410, detail="This shared link has expired")
+
+    # 2. Update access time
+    await Database.execute(
+        "UPDATE client_report_tokens SET last_accessed_at = CURRENT_TIMESTAMP WHERE token = ?",
+        (token,)
+    )
+
+    # 3. Fetch and return report data using utils
+    return await get_client_report_data(
+        user_id=token_row["user_id"],
+        client_id=token_row["client_id"],
+        page=1,
+        limit=10
+    )
