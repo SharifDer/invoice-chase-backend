@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=AnalyticsResponse)
+@router.get("/get_analytics", response_model=AnalyticsResponse)
 async def get_analytics(
     period: Literal["7days", "30days"] = Query(default="7days"),
     # current_user: dict = Depends(get_current_user)
@@ -257,7 +257,8 @@ async def _get_top_clients_by_balance(user_id: int, limit: int = 5) -> List[TopC
     """
 
     query = """
-    SELECT 
+    SELECT
+        c.id, 
         c.name,
         c.company,
         (
@@ -277,6 +278,7 @@ async def _get_top_clients_by_balance(user_id: int, limit: int = 5) -> List[TopC
     top_clients = []
     for result in results:
         top_clients.append(TopClientByBalanceData(
+            client_id=result["id"],
             name=result['name'],
             company=result['company'] or "",
             balance=float(result['balance'])
@@ -329,22 +331,17 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBa
         results = await Database.fetch_all(query, (user_id, days_threshold))
         
         clients = []
-        total_amount = 0.0
         
         for result in results:
-            balance = float(result['balance'])
-            total_amount += balance
-            
             clients.append(AgingBalanceClientData(
                 name=result['name'],
                 company=result['company'] or "",
-                balance=balance,
+                balance=float(result['balance']),
                 daysSincePayment=result['days_since_payment']
             ))
         
         return AgingBalancesData(
             count=len(clients),
-            totalAmount=total_amount,
             clients=clients
         )
     
