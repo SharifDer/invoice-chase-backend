@@ -173,7 +173,15 @@ async def create_transaction(request: UnifiedTransactionRequest
                 status_code=400, detail="Client not found or doesn't belong to you"
             )
         client_id = client["id"]
-
+    if not request.transaction.description:
+        if request.transaction.type.lower() == "invoice":
+            description = "Invoice issued for and recorded"
+        elif request.transaction.type.lower() == "payment":
+            description = "Payment received and recorded"
+        else:
+            description = "Transaction recorded"
+    else:
+        description = request.transaction.description
     # Insert transaction
     await Database.execute("""
         INSERT INTO transactions (user_id, client_id, transaction_number, amount, type, description, created_date)
@@ -184,7 +192,7 @@ async def create_transaction(request: UnifiedTransactionRequest
         "TEMP",
         float(request.transaction.amount),
         request.transaction.type,
-        request.transaction.description,
+        description,
         date.today()
     ))
 
