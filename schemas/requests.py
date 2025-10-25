@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field,model_validator
 from typing import Optional,Literal, List
 from datetime import date
 from decimal import Decimal
@@ -29,13 +29,20 @@ class ReqUserLogin(BaseModel):
 # ======================
 # Client Requests
 # ======================
+class ClientNotificationSettings(BaseModel):
+    communication_method: str = Field(..., pattern="^(email|sms)$")
+    send_transaction_notifications: bool = True
+    send_automated_reminders: bool = True
+    reminder_frequency_days: int = 7
+    reminder_minimum_balance: float = 0.0
 
 class ClientCreateRequest(BaseModel):
     name: str = Field(..., min_length=1)
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     company: Optional[str] = None
-
+    apply_user_settings : bool = True
+    notification_settings: Optional[ClientNotificationSettings] = None
 class ClientUpdateRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -48,31 +55,38 @@ class ClientUpdateRequest(BaseModel):
     min_balance_to_remind : Optional[float] = None
 
 # ======================
-# Invoice Requests
+# Transactions Requests
 # ======================
 
-class InvoiceCreateRequest(BaseModel):
-    client_id: int
-    type : str = Literal['payment', 'invoice']
+class TransactionCreateRequest(BaseModel):
+    client_id: Optional[int] = None  # optional here
+    type: Literal['payment', 'invoice']
     amount: Decimal = Field(..., gt=0)
     description: Optional[str] = None
 
-
-class InvoiceCreateRequestNewClient(BaseModel):
-    type : str = Literal['payment', 'invoice']
-    amount: Decimal = Field(..., gt=0)
-    description: Optional[str] = None
-    status: Optional[str] = Field("Draft", pattern="^(Draft|Pending|Paid|Overdue)$")
    
+class UnifiedTransactionRequest(BaseModel):
+    is_new_client: bool
+    transaction: TransactionCreateRequest
+    client: Optional[ClientCreateRequest] = None
+    @model_validator(mode="after")
+    def validate_client_fields(cls, values):
+        is_new = values.is_new_client
+        transaction = values.transaction
+        client = getattr(values, "client", None) 
 
+        if is_new:
+            if not client:
+                raise ValueError("Client data is required for new client transactions")
+        else:
+            if not transaction.client_id:
+                raise ValueError("client_id is required for existing client transactions")
+        return values
 class TransactionUpdateRequest(BaseModel):
-    # client_id: Optional[int] = None
-    # trans_num: Optional[str] = None
     amount: Optional[Decimal] = Field(None, gt=0)
     description: Optional[str] = None
     type : Optional[str] = None
     created_at : Optional[date] = None
-    # status: Optional[str] = Field(None, pattern="^(Draft|Pending|Paid|Overdue)$")
 
 # ======================
 # Reminders Requests
@@ -83,3 +97,10 @@ class EmailSendReq(BaseModel):
 
 class UrgentReminderReq(BaseModel):
     client_ids: List[int]  
+
+
+
+class BusinessNameCurrency(BaseModel):
+    business_name : str
+    currency : str
+    currency_symbol : str
