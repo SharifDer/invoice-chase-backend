@@ -51,10 +51,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(transactions.router, prefix="/invoices", tags=["Invoices"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(transactions.router, prefix="/transactions", tags=["Transactions"])
 app.include_router(clients.router, prefix="/clients", tags=["Clients"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
 app.include_router(reminders.router, prefix="/reminders", tags=["Reminders"])
 
