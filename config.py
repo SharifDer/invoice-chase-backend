@@ -3,9 +3,6 @@ from typing import Optional
 from dotenv import load_dotenv
 import json
 
-# Load environment variables
-load_dotenv(".env.example")
-
 
 class Settings:
     # Database
@@ -19,7 +16,7 @@ class Settings:
     twilio_auth_token : str = ""
     twilio_number : str = ""
 
-    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    DEBUG: bool = "true"
     @classmethod
     def get_conf(cls):
         
