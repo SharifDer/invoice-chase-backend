@@ -1,13 +1,5 @@
 name: InvoiceChase CI/CD
 
-# Automatic triggers commented out for safety
-# on:
-#   push:
-#     branches:
-#       - main
-#   pull_request:
-
-# Manual trigger for dev branch (or other branch you select)
 on:
   workflow_dispatch:
     inputs:
@@ -21,53 +13,51 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # These are pulled from your GitHub Secrets
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       API_KEYS_JSON: ${{ secrets.API_KEYS_JSON }}
 
     steps:
-      # 1️⃣ Checkout the branch selected in the manual trigger
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Deploy code to VPS
+        uses: appleboy/ssh-action@v0.1.7
         with:
-          ref: ${{ github.event.inputs.branch }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          
+          # This script runs ON YOUR SERVER
+          script: |
+            set -e  # Exit immediately if a command fails
+            DEPLOY_DIR=/opt/invoicechase
 
-      # 2️⃣ Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
+            # 1. Ensure deploy dir exists
+            mkdir -p $DEPLOY_DIR
 
-      # 3️⃣ Install Python dependencies
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+            # 2. Pull latest code (clone if first deploy)
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              git clone -b ${{ github.event.inputs.branch }} https://github.com/${{ github.repository }}.git $DEPLOY_DIR
+            else
+              cd $DEPLOY_DIR
+              git fetch origin
+              git reset --hard origin/${{ github.event.inputs.branch }}
+            fi
 
-      # 4️⃣ Prepare keys folder and files
-      - name: Prepare keys folder
-        run: |
-          mkdir -p keys
-          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > keys/firebase.json
-          echo "$API_KEYS_JSON" > keys/keys.json
+            # 3. Ensure virtualenv exists
+            if [ ! -d "$DEPLOY_DIR/venv" ]; then
+              python3.12 -m venv $DEPLOY_DIR/venv
+            fi
 
-      # ------------------------
-      # 5️⃣ Placeholder: Deploy to server via SSH
-      # Safe and commented. Uncomment when ready.
-      # ------------------------
-      # - name: Deploy to server via SSH
-      #   uses: easingthemes/ssh-deploy@v2
-      #   with:
-      #     SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
-      #     REMOTE_HOST: ${{ secrets.SERVER_HOST }}
-      #     REMOTE_USER: ${{ secrets.SERVER_USER }}
-      #     TARGET: /path/to/deployment
-      #     SOURCE: "."
+            # 4. Activate venv and install requirements
+            source $DEPLOY_DIR/venv/bin/activate
+            pip install --upgrade pip
+            pip install -r $DEPLOY_DIR/requirements.txt
 
-      # ------------------------
-      # 6️⃣ Placeholder: Start server
-      # The uvicorn command will start your FastAPI app.
-      # Commented to prevent accidental server restart.
-      # ------------------------
-      # - name: Start server
-      #   run: |
-      #     uvicorn main:app --host 0.0.0.0 --port 8000
+            # 5. Create the secret key files ON THE SERVER
+            mkdir -p $DEPLOY_DIR/keys
+            echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > $DEPLOY_DIR/keys/firebase.json
+            echo "$API_KEYS_JSON" > $DEPLOY_DIR/keys/keys.json
+
+            # 6. Restart the FastAPI app using systemd
+            # This is the final step that makes your app live
+            sudo systemctl restart invoicechase
