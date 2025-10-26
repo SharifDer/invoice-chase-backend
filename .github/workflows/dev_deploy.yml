@@ -12,10 +12,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    env:
-      # These are pulled from your GitHub Secrets
-      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      API_KEYS_JSON: ${{ secrets.API_KEYS_JSON }}
+    # The top-level 'env:' block is no longer needed
+    # env:
+    #   FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+    #   API_KEYS_JSON: ${{ secrets.API_KEYS_JSON }}
 
     steps:
       - name: Deploy code to VPS
@@ -54,9 +54,16 @@ jobs:
             pip install -r $DEPLOY_DIR/requirements.txt
 
             # 5. Create the secret key files ON THE SERVER
+            # This method injects the secret directly, which is safer for JSON.
             mkdir -p $DEPLOY_DIR/keys
-            echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > $DEPLOY_DIR/keys/firebase.json
-            echo "$API_KEYS_JSON" > $DEPLOY_DIR/keys/keys.json
+
+            cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
+            ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+            EOF
+            
+            cat <<'EOF' > $DEPLOY_DIR/keys/keys.json
+            ${{ secrets.API_KEYS_JSON }}
+            EOF
 
             # 6. Restart the FastAPI app using systemd
             # This is the final step that makes your app live
