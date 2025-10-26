@@ -68,11 +68,11 @@ class BusinessProfile(BaseModel):
     business_website: Optional[str] = None
     business_address: Optional[str] = None
 class ClientReportResponse(BaseModel):
-    id: int
-    name: str
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    company: Optional[str] = None
+    client_id: int
+    client_name: str
+    client_email: Optional[EmailStr] = None
+    client_phone: Optional[str] = None
+    client_company: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     total_invoiced: float
@@ -91,7 +91,7 @@ class ClientSettingsResponse(BaseModel):
     reminderIntervalDays : int
     reminderMinimumAmount : float
 # Invoice Responses
-class InvoiceResponse(BaseModel):
+class TransactionResponse(BaseModel):
   message : str
   status : str
 
@@ -101,12 +101,12 @@ class TransCreationResponse(BaseModel):
     status : str
 
 class TransactionDetailsResponse(BaseModel):
-    client_company : str
-    client_email : str
-    Description : str
+    client_company: Optional[str] = None
+    client_email: Optional[str] = None
+    Description: Optional[str] = None
 
 class TransactionResponse(BaseModel):
-    # id: int
+    transaction_number: str        ##transaction number not db id 
     client_id: int
     client_name: str
     type: str               # "invoice" | "payment"
@@ -127,11 +127,13 @@ class TransactionListResponse(BaseModel):
 # Dashboard Responses
 
 class TransactionSummary(BaseModel):
-    id: int
+    id: int        ##this is the id for the system
+    trans_id : str  ## this is the id of this transaction for the user, this is what appears int the frontend
     type: str  # 'payment' or 'invoice'
-    created_at: str
+    client_name : str
+    clientId : int
     amount: Decimal
-    client_name: str
+    created_at: str
 
 class TodayMomentum(BaseModel):
     todayInvoices: int
@@ -153,7 +155,9 @@ class DashboardStatsResponse(BaseModel):
     todayMomentum: TodayMomentum
     recent_transactions: List[TransactionSummary]
 
-
+class CurrencyResponse(BaseModel):
+    currency_symbol : str 
+    currency_name : str
 # Analytics Response Models
 class TotalClientBalancesData(BaseModel):
     current: float
@@ -178,6 +182,7 @@ class WeeklyCashFlowData(BaseModel):
 
 
 class TopClientByBalanceData(BaseModel):
+    client_id : int
     name: str
     company: str
     balance: float
@@ -192,7 +197,6 @@ class AgingBalanceClientData(BaseModel):
 
 class AgingBalancesData(BaseModel):
     count: int
-    totalAmount: float
     clients: List[AgingBalanceClientData]
 
 
@@ -216,21 +220,20 @@ class BusinessDataRes(BaseModel):
     business_email: Optional[EmailStr] = None
     phone: Optional[str] = None
     website: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[str] = None  ##Business address in frontend
     logo_url: Optional[str] = None
     
 class NotificationSettings(BaseModel):
-    communication_method: str  # email | sms | both
-    send_automated_reminders: bool
-    reminder_frequency_days: int
-    reminder_minimum_balance: float
-    send_transaction_notifications: bool
-
+    communication_method: Optional[str] = None
+    send_automated_reminders: Optional[bool] = None
+    reminder_frequency_days: Optional[int] = None
+    reminder_minimum_balance: Optional[float] = None
+    send_transaction_notifications: Optional[bool] = None
 ### Reminders responses 
-class TestEmailReminderRes(BaseModel):
+class TestReminderRes(BaseModel):
     status : str 
     message : str
-    sent_to : str
+    sent_to : Optional[str]
 # Health Check Response
 class HealthCheckResponse(BaseModel):
     status: str

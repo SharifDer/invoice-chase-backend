@@ -1,0 +1,63 @@
+name: InvoiceChase CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        default: 'dev'
+        required: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      # These are pulled from your GitHub Secrets
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      API_KEYS_JSON: ${{ secrets.API_KEYS_JSON }}
+
+    steps:
+      - name: Deploy code to VPS
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          
+          # This script runs ON YOUR SERVER
+          script: |
+            set -e  # Exit immediately if a command fails
+            DEPLOY_DIR=/opt/invoicechase
+
+            # 1. Ensure deploy dir exists
+            mkdir -p $DEPLOY_DIR
+
+            # 2. Pull latest code (clone if first deploy)
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              git clone -b ${{ github.event.inputs.branch }} https://github.com/${{ github.repository }}.git $DEPLOY_DIR
+            else
+              cd $DEPLOY_DIR
+              git fetch origin
+              git reset --hard origin/${{ github.event.inputs.branch }}
+            fi
+
+            # 3. Ensure virtualenv exists
+            if [ ! -d "$DEPLOY_DIR/venv" ]; then
+              python3.12 -m venv $DEPLOY_DIR/venv
+            fi
+
+            # 4. Activate venv and install requirements
+            source $DEPLOY_DIR/venv/bin/activate
+            pip install --upgrade pip
+            pip install -r $DEPLOY_DIR/requirements.txt
+
+            # 5. Create the secret key files ON THE SERVER
+            mkdir -p $DEPLOY_DIR/keys
+            echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > $DEPLOY_DIR/keys/firebase.json
+            echo "$API_KEYS_JSON" > $DEPLOY_DIR/keys/keys.json
+
+            # 6. Restart the FastAPI app using systemd
+            # This is the final step that makes your app live
+            sudo systemctl restart invoicechase

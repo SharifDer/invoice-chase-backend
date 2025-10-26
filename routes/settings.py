@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from database import Database
 from auth import get_current_user
 from logger import get_logger
 from schemas.responses import (BusinessDataRes, NotificationSettings)
+from .utils import fetch_business_info
 logger = get_logger(__name__)
 router = APIRouter( tags=["Settings"])
 
@@ -17,9 +17,7 @@ async def get_business_info(
     ):
     # user_id = current_user["user_id"]
     user_id = 1
-    record = await Database.fetch_one(
-        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
-    )
+    record = await fetch_business_info(user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Business info not found")
     return record
@@ -39,7 +37,7 @@ async def create_business_info_record(data: BusinessDataRes):
         """,
         (user_id, data.business_name, data.business_email, data.phone, data.website, data.address, data.logo_url)
     )
-    return await get_business_info()
+    return await fetch_business_info(user_id)
 
 # Update existing business info
 @router.put("/business/update", response_model=BusinessDataRes)
@@ -57,70 +55,72 @@ async def update_business_info_record(data: BusinessDataRes):
         """,
         (data.business_name, data.business_email, data.phone, data.website, data.address, data.logo_url, user_id)
     )
-    return await get_business_info()
+    return await fetch_business_info(user_id)
 
 # --- NOTIFICATION SETTINGS CRUD --- #
 @router.get("/notifications", response_model=NotificationSettings)
-async def get_notification_settings(
-    # current_user: dict = Depends(get_current_user)
-                                    ):
-    # user_id = current_user["user_id"]
+async def get_notification_settings():
     user_id = 1
-    record = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
+    record = await fetch_notification_settings(user_id)
     if not record:
-        # Return defaults if not set
         raise HTTPException(status_code=404, detail="Notification settings not found")
     return record
 
 @router.put("/notifications", response_model=NotificationSettings)
-async def update_notification_settings(data: NotificationSettings, 
-                                    #    current_user: dict = Depends(get_current_user)
-                                       ):
-    # user_id = current_user["user_id"]
+async def update_notification_settings(data: NotificationSettings):
     user_id = 1
-    comm_type = data.communication_method  # email | sms | both
 
-    existing = await Database.fetch_one("SELECT id FROM user_settings WHERE user_id = ?", (user_id,))
+    existing = await Database.fetch_one(
+        "SELECT id FROM user_settings WHERE user_id = ?", (user_id,)
+    )
+
     if existing:
-        await Database.execute(
-            """
-            UPDATE user_settings
-            SET reminder_type = ?, transaction_notification_type = ?, 
-                send_automated_reminders = ?, reminder_frequency_days = ?, 
-                reminder_minimum_balance = ?, send_transaction_notifications = ?,
-                reminder_template = ?, notification_template = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = ?
-            """,
-            (
-                comm_type,
-                comm_type,
-                data.send_automated_reminders,
-                data.reminder_frequency_days,
-                data.reminder_minimum_balance,
-                data.send_transaction_notifications,
-                data.reminder_template,
-                data.notification_template,
-                user_id
-            )
-        )
+        # build dynamic update
+        update_fields = []
+        values = []
+
+        for field, value in data.dict(exclude_unset=True).items():
+            if field == "reminder_frequency_days":
+                update_fields.append(
+                    "reminder_next_date = DATETIME(STRFTIME('%Y-%m-%d %H:00:00', DATETIME('now', '+' || ? || ' days')))"
+                )
+                values.append(value)
+            update_fields.append(f"{field} = ?")
+            values.append(value)
+
+        if update_fields:
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            sql = f"UPDATE user_settings SET {', '.join(update_fields)} WHERE user_id = ?"
+            values.append(user_id)
+            await Database.execute(sql, tuple(values))
     else:
         await Database.execute(
             """
-            INSERT INTO user_settings (user_id, reminder_type, transaction_notification_type, 
-                send_automated_reminders, reminder_frequency_days, reminder_minimum_balance, send_transaction_notifications,
-                reminder_template, notification_template)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO user_settings (
+                user_id, communication_method, 
+                send_automated_reminders, reminder_frequency_days, reminder_minimum_balance, 
+                send_transaction_notifications, reminder_next_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 
+                    CASE WHEN ? IS NOT NULL 
+                    THEN DATETIME(STRFTIME('%Y-%m-%d %H:00:00', DATETIME('now', '+' || ? || ' days'))) 
+                    ELSE NULL END)
             """,
             (
                 user_id,
-                comm_type,
-                comm_type,
+                data.communication_method,
                 data.send_automated_reminders,
                 data.reminder_frequency_days,
                 data.reminder_minimum_balance,
                 data.send_transaction_notifications,
-                data.reminder_template,
-                data.notification_template
-            )
+                data.reminder_frequency_days,
+                data.reminder_frequency_days,
+            ),
         )
-    return await get_notification_settings()
+
+    return await fetch_notification_settings(user_id)
+
+async def fetch_notification_settings(user_id) :
+    record = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
+    settings = {k: v for k, v in record.items() if v is not None}
+    return settings
