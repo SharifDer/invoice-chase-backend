@@ -25,7 +25,7 @@ router = APIRouter()
 @router.get("/get_analytics", response_model=AnalyticsResponse)
 async def get_analytics(
     period: Literal["7days", "30days"] = Query(default="7days"),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get analytics data for the dashboard
@@ -43,8 +43,8 @@ async def get_analytics(
     - Net cash change for period
     """
 
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+    # user_id = 1
     days = 7 if period == "7days" else 30
     
     logger.info(f"Fetching analytics for user {user_id}, period: {period}")
