@@ -76,9 +76,10 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
 @router.post("/Send_test_email", response_model=TestReminderRes)
 async def send_test_email(
     request: EmailSendReq,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    user_id = 1  # replace with current_user["user_id"] in real auth
+    # user_id = 1 
+    user_id = current_user["user_id"]
     user_info = await get_user_business_info(user_id)
 
     if not user_info:
@@ -132,8 +133,11 @@ async def send_test_email(
 
 # ---------- Test SMS Endpoint ----------
 @router.post("/Send_test_sms", response_model=TestReminderRes)
-async def send_test_sms(request: EmailSendReq):
-    user_id = 1  # replace with current_user["user_id"] in real auth
+async def send_test_sms(request: EmailSendReq,
+                        current_user : dict = Depends(get_current_user)
+                        ):
+    # user_id = 1
+    user_id = current_user["user_id"]
     user_info = await get_user_business_info(user_id)
 
     if not user_info or not user_info.get("phone"):
@@ -178,10 +182,10 @@ async def send_test_sms(request: EmailSendReq):
 
 @router.post("/Send_urgent_reminders")
 async def send_urgent_reminders(request: UrgentReminderReq,
-                                # current_user = Depends(get_current_user)
+                                current_user = Depends(get_current_user)
                                 ):
-    # user_id = current_user['user_id']
-    user_id = 1  # replace with current_user["user_id"]
+    user_id = current_user['user_id']
+    # user_id = 1 
     clients = await get_clients_balance(user_id, request.client_ids)
 
     results = []
