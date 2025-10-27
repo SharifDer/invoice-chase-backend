@@ -23,12 +23,12 @@ router = APIRouter()
 async def get_clients(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get all clients for the current user with aggregated totals and pagination"""
     try:
-        # user_id = current_user["user_id"]
-        user_id = 1
+        user_id = current_user["user_id"]
+        # user_id = 1
 
         # Count total clients for pagination
         count_query = "SELECT COUNT(*) AS total FROM clients WHERE user_id = ?"
@@ -89,24 +89,22 @@ async def get_client_report(
     client_id: int,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get detailed report of a client with paginated transactions and business profile"""
 
-    # user_id = current_user["user_id"]
-    user_id = 1
+    user_id = current_user["user_id"]
     return await get_client_report_data(user_id, client_id, page, limit)
 
 
 
 @router.get("/get_client/{client_id}", response_model=ClientResponse)
 async def get_client(client_id: int,
-                    #   current_user: dict = Depends(get_current_user)
+                      current_user: dict = Depends(get_current_user)
                     ):
     """Get a specific client by ID"""
     try:
-        # user_id = current_user['id']
-        user_id = 1
+        user_id = current_user['id']
         query = "SELECT * FROM clients WHERE id = ? AND user_id = ?"
         client = await Database.fetch_one(query, (client_id, user_id))
         
@@ -131,11 +129,11 @@ async def get_client(client_id: int,
 @router.post("/create_client", response_model=ClientResponse)
 async def create_client(
     request: ClientCreateRequest,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Create a new client"""
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+
     # Check if client with same email already exists for this user
     await check_existing_client(user_id, request.email)
     created_client = await insert_client_record(
@@ -159,12 +157,12 @@ async def create_client(
 async def update_client(
     client_id: int,
     request: ClientUpdateRequest,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Update an existing client"""
  
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+    # user_id = 1
     # Check if client exists and belongs to user
     existing_client = await Database.fetch_one(
         "SELECT * FROM clients WHERE id = ? AND user_id = ?",
@@ -294,10 +292,10 @@ async def update_client(
 
 @router.get("/get_client_settings/{client_id}", response_model=ClientSettingsResponse)
 async def get_client_settings(client_id : int ,
-                            #   current_user: dict = Depends(get_current_user)
+                              current_user: dict = Depends(get_current_user)
                               ):
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+    # user_id = 1
     client_settings = await Database.fetch_one("SELECT * FROM client_settings WHERE client_id = ? AND user_id = ?",
         (client_id, user_id))
     if not client_settings :
@@ -318,12 +316,12 @@ async def get_client_settings(client_id : int ,
 
 @router.delete("/delete_client/{client_id}", response_model=BaseResponse)
 async def delete_client(client_id: int,
-                        #  current_user: dict = Depends(get_current_user)
+                         current_user: dict = Depends(get_current_user)
                         ):
     """Delete a client"""
   
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+    # user_id = 1
     # Check if client exists and belongs to user
     existing_client = await Database.fetch_one(
         "SELECT * FROM clients WHERE id = ? AND user_id = ?",
@@ -358,15 +356,15 @@ async def delete_client(client_id: int,
 
 @router.get("/clients/search")
 async def search_clients(q: str,
-                        #  current_user: dict = Depends(get_current_user)
+                         current_user: dict = Depends(get_current_user)
                          ):
     """
     Search clients by name, company, or email (min 2 characters).
     """
     if len(q) < 2:
         return {"clients": []}
-    user_id = 1
-    # user_id = current_user["user_id"]
+    # user_id = 1
+    user_id = current_user["user_id"]
     query = """
         SELECT id, name, email, phone, company
         FROM clients
@@ -382,11 +380,10 @@ async def search_clients(q: str,
 
 @router.post("/clients/{client_id}/share")
 async def generate_client_report_token(client_id: int,
-                                       request : Request
-                                    #    current_user: dict = Depends(get_current_user)
+                                       request : Request,
+                                       current_user: dict = Depends(get_current_user)
                                        ):
-    # user_id = current_user['user_id']
-    user_id = 1  # TODO: from current_user["user_id"]
+    user_id = current_user['user_id']
     token = str(uuid.uuid4())
     expires_at = datetime.utcnow() + timedelta(days=7)  # expires in 7 days
 
