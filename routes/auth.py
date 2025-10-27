@@ -14,18 +14,25 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-async def _get_or_create_user(uid: str, email: str, name: str = None):
+async def _get_or_create_user(uid: str, email: str, name: str = None ,email_verified: bool = False):
     """Fetch user from DB or create if missing."""
     user = await Database.fetch_one("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
     if not user:
         query = """
-        INSERT INTO users (firebase_uid, email, name)
-        VALUES (?, ?, ?)
+        INSERT INTO users (firebase_uid, email, name, email_verified)
+        VALUES (?, ?, ?, ?)
         """
-        await Database.execute(query, (uid, email, name))
+        await Database.execute(query, (uid, email, name, email_verified))
 
         user = await Database.fetch_one("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
         logger.info(f"New Firebase user created: {email}")
+    else:
+        # Update email_verified if user already exists and value changed
+        if user["email_verified"] != email_verified:
+            await Database.execute(
+                "UPDATE users SET email_verified = ? WHERE firebase_uid = ?",
+                (email_verified, uid)
+            )
     return user
 
 
@@ -225,7 +232,8 @@ async def signup(request: FirebaseLoginRequest):
         user = await _get_or_create_user(
             decoded["uid"],
             request.email or decoded.get("email"),
-            request.name
+            request.name,
+            decoded.get("email_verified", False)
         )
         return AuthResponse(user=UserResponse(**user), message="User created successfully")
     except Exception as e:
@@ -241,7 +249,8 @@ async def login(request: FirebaseLoginRequest):
         user = await _get_or_create_user(
             decoded["uid"],
             request.email or decoded.get("email"),
-            request.name
+            request.name,
+            decoded.get("email_verified", False)
         )
         return AuthResponse(user=UserResponse(**user), message="Login successful")
     except Exception as e:
@@ -257,7 +266,8 @@ async def google_auth(request: GoogleAuthRequest):
         user = await _get_or_create_user(
             decoded["uid"],
             request.email or decoded.get("email"),
-            request.name
+            request.name,
+            decoded.get("email_verified", False)
         )
         return AuthResponse(user=UserResponse(**user), message="Google authentication successful")
     except Exception as e:
