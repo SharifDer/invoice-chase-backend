@@ -21,10 +21,10 @@ router = APIRouter()
 @router.get("/get_transaction/{trans_id}", response_model=TransactionDetailsResponse)
 async def get_transaction(
         trans_id: str,  # transaction_number
-        # current_user: dict = Depends(get_current_user)
+        current_user: dict = Depends(get_current_user)
     ):
-    # user_id = current_user["id"]
-    user_id = 1
+    user_id = current_user["id"]
+    # user_id = 1
     trans_id = trans_id.strip('"').strip("'")
     transaction = await Database.fetch_one(
         """
@@ -55,11 +55,11 @@ async def get_transactions(
     date_to: date | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get transactions for current user with filtering and pagination"""
-    # user_id = current_user["id"]
-    user_id = 1
+    user_id = current_user["id"]
+    # user_id = 1
 
     # --- 1. Build WHERE clause dynamically ---
     where_conditions = ["t.user_id = ?"]
@@ -140,10 +140,10 @@ async def get_transactions(
 
 @router.post("/create_transaction", response_model=TransCreationResponse)
 async def create_transaction(request: UnifiedTransactionRequest
-                            #  ,current_user: dict = Depends(get_current_user)
+                             ,current_user: dict = Depends(get_current_user)
                              ):
-    # user_id = current_user["user_id"]
-    user_id = 1  # replace with current_user['user_id']
+    user_id = current_user["user_id"]
+    # user_id = 1  # replace with current_user['user_id']
 
     # try:
     if request.is_new_client:
@@ -237,11 +237,11 @@ async def create_transaction(request: UnifiedTransactionRequest
 async def update_invoice(
     trans_id: str,
     request: TransactionUpdateRequest,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Update an existing invoice"""
     # try:
-    # user_id = current_user['user_id']
+    user_id = current_user['user_id']
     trans_id = trans_id.strip('"').strip("'")
     user_id = 1
     # Check if invoice exists and belongs to user
@@ -322,11 +322,11 @@ async def update_invoice(
 
 @router.delete("/delete_transaction/{trans_id}", response_model=BaseResponse)
 async def delete_invoice(trans_id: str, 
-                        #  current_user: dict = Depends(get_current_user)
+                         current_user: dict = Depends(get_current_user)
                          ):
     """Delete transaction"""
     try:
-        # user_id = current_user['user_id']
+        user_id = current_user['user_id']
         trans_id = trans_id.strip('"').strip("'")
         user_id = 1
         # Delete invoice
