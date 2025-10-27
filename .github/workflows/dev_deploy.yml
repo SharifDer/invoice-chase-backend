@@ -12,11 +12,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    # The top-level 'env:' block is no longer needed
-    # env:
-    #   FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-    #   API_KEYS_JSON: ${{ secrets.API_KEYS_JSON }}
-
     steps:
       - name: Deploy code to VPS
         uses: appleboy/ssh-action@v0.1.7
@@ -24,17 +19,17 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 22
+          # This is the new port you just set up
+          port: 2222
           
-          # This script runs ON YOUR SERVER
           script: |
-            set -e  # Exit immediately if a command fails
+            set -e
             DEPLOY_DIR=/opt/invoicechase
 
             # 1. Ensure deploy dir exists
             mkdir -p $DEPLOY_DIR
 
-            # 2. Pull latest code (clone if first deploy)
+            # 2. Pull latest code
             if [ ! -d "$DEPLOY_DIR/.git" ]; then
               git clone -b ${{ github.event.inputs.branch }} https://github.com/${{ github.repository }}.git $DEPLOY_DIR
             else
@@ -43,20 +38,19 @@ jobs:
               git reset --hard origin/${{ github.event.inputs.branch }}
             fi
 
-            # 3. Ensure virtualenv exists
+            # 3. Create virtualenv
             if [ ! -d "$DEPLOY_DIR/venv" ]; then
               python3.12 -m venv $DEPLOY_DIR/venv
             fi
 
-            # 4. Activate venv and install requirements
+            # 4. Install requirements
             source $DEPLOY_DIR/venv/bin/activate
             pip install --upgrade pip
             pip install -r $DEPLOY_DIR/requirements.txt
 
-            # 5. Create the secret key files ON THE SERVER
-            # This method injects the secret directly, which is safer for JSON.
+            # 5. Create secret files
             mkdir -p $DEPLOY_DIR/keys
-
+            
             cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
             ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
             EOF
@@ -65,6 +59,5 @@ jobs:
             ${{ secrets.API_KEYS_JSON }}
             EOF
 
-            # 6. Restart the FastAPI app using systemd
-            # This is the final step that makes your app live
+            # 6. Restart the app service
             sudo systemctl restart invoicechase
