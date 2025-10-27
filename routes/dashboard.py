@@ -139,15 +139,15 @@ async def get_recent_transactions(user_id: int, limit: int = 5)-> TransactionSum
 # ----------------------------
 
 @router.get("/stats", response_model=DashboardStatsResponse)
-async def get_dashboard_stats():
+async def get_dashboard_stats(current_user : dict = Depends(get_current_user)):
     """
     Get dashboard statistics and overview data:
     - Totals
     - Today's momentum
     - Last 5 transactions
     """
-    user_id = 1  # Replace with get_current_user(user).id in production
-
+   
+    user_id = current_user["user_id"]
     totals = await get_total_stats(user_id)
     today_momentum = await get_today_momentum(user_id)
     recent_transactions = await get_recent_transactions(user_id)
@@ -163,10 +163,9 @@ async def get_dashboard_stats():
 
 @router.get("/get_currency" , response_model=CurrencyResponse)
 async def get_user_currency(
-    # current_user : dict = Depends(get_current_user)
+    current_user : dict = Depends(get_current_user)
                         ):
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
     currency_data = await fetch_user_currency(user_id)
     return currency_data
 
@@ -175,10 +174,9 @@ async def get_user_currency(
 @router.post("/set_busname_currency")
 async def set_business_name_currency(
     request: BusinessNameCurrency,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    # user_id = current_user["user_id"]
-    user_id = 1
+    user_id = current_user["user_id"]
 
     # 1️⃣ Insert or update business name in business_info table
     insert_business_sql = """
