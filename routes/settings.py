@@ -13,9 +13,9 @@ router = APIRouter( tags=["Settings"])
 # --- BUSINESS INFO CRUD --- #
 @router.get("/business", response_model=BusinessDataRes)
 async def get_business_info(
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
     ):
-    # user_id = current_user["user_id"]
+    user_id = current_user["user_id"]
     user_id = 1
     record = await fetch_business_info(user_id)
     if not record:
@@ -24,8 +24,11 @@ async def get_business_info(
 
 # Create new business info
 @router.post("/business/create", response_model=BusinessDataRes)
-async def create_business_info_record(data: BusinessDataRes):
-    user_id = 1  # replace with current_user["user_id"]
+async def create_business_info_record(data: BusinessDataRes,
+                                      current_user : dict = Depends(get_current_user)
+                                      ):
+    # user_id = 1  # replace with current_user["user_id"]
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one("SELECT id FROM business_info WHERE user_id = ?", (user_id,))
     if existing:
         raise HTTPException(status_code=400, detail="Business info already exists")
@@ -41,8 +44,11 @@ async def create_business_info_record(data: BusinessDataRes):
 
 # Update existing business info
 @router.put("/business/update", response_model=BusinessDataRes)
-async def update_business_info_record(data: BusinessDataRes):
-    user_id = 1  # replace with current_user["user_id"]
+async def update_business_info_record(data: BusinessDataRes,
+                                      current_user : dict = Depends(get_current_user)
+                                      ):
+    # user_id = 1  # replace with current_user["user_id"]
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one("SELECT id FROM business_info WHERE user_id = ?", (user_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Business info not found")
@@ -59,17 +65,19 @@ async def update_business_info_record(data: BusinessDataRes):
 
 # --- NOTIFICATION SETTINGS CRUD --- #
 @router.get("/notifications", response_model=NotificationSettings)
-async def get_notification_settings():
-    user_id = 1
+async def get_notification_settings(current_user : dict = Depends(get_current_user)):
+    user_id = current_user["user_id"]
     record = await fetch_notification_settings(user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Notification settings not found")
     return record
 
 @router.put("/notifications", response_model=NotificationSettings)
-async def update_notification_settings(data: NotificationSettings):
-    user_id = 1
-
+async def update_notification_settings(data: NotificationSettings,
+                                       current_user : dict = Depends(get_current_user)
+                                       ):
+    
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one(
         "SELECT id FROM user_settings WHERE user_id = ?", (user_id,)
     )
