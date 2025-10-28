@@ -48,7 +48,7 @@ async def create_user(request: CreateUserRequest):
             password=request.password,
             display_name=request.name
         )
-        user = await _get_or_create_user(user_record.uid, request.email, request.name)
+        user = await _get_or_create_user(user_record.uid, user_record.email, user_record.name , email_verified=user_record.email_verified)
         return AuthResponse(user=UserResponse(**user), message="User created successfully")
     except Exception as e:
         logger.error(f"Backend create user error: {e}")
@@ -76,10 +76,12 @@ async def login_user(req: ReqUserLogin) -> dict:
 
     # (Optional) Verify ID token with Admin SDK to keep same flow as your /login endpoint
     decoded = auth.verify_id_token(response["idToken"])
+    print("decoded ", decoded)
     user = await _get_or_create_user(
         decoded["uid"],
         decoded.get("email"),
         decoded.get("name"),
+        decoded.get("email_verified")
     )
 
     return {
@@ -231,7 +233,7 @@ async def signup(request: FirebaseLoginRequest):
         decoded = firebase_auth.verify_id_token(request.firebase_token)
         user = await _get_or_create_user(
             decoded["uid"],
-            request.email or decoded.get("email"),
+            decoded.get("email"),
             request.name,
             decoded.get("email_verified", False)
         )
@@ -246,10 +248,11 @@ async def login(request: FirebaseLoginRequest):
     """Login user using Firebase ID token (no password check)."""
     try:
         decoded = firebase_auth.verify_id_token(request.firebase_token)
+        print("decoded dec ", decoded)
         user = await _get_or_create_user(
             decoded["uid"],
-            request.email or decoded.get("email"),
-            request.name,
+            decoded.get("email"),
+            decoded.get("name"),
             decoded.get("email_verified", False)
         )
         return AuthResponse(user=UserResponse(**user), message="Login successful")
