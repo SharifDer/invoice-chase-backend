@@ -16,8 +16,8 @@ class CreateUserRequest(BaseModel):
 # Frontend Firebase login/signup
 class FirebaseLoginRequest(BaseModel):
     firebase_token: str
-    email: Optional[EmailStr] = None  # optional, for storing in DB
-    name: str = Field(..., min_length=1)
+    # email: Optional[EmailStr] = None  # optional, for storing in DB
+    # name: str = Field(..., min_length=1)
 
 class GoogleAuthRequest(BaseModel):
     firebase_token: str
