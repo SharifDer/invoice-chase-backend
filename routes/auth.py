@@ -248,7 +248,6 @@ async def login(request: FirebaseLoginRequest):
     """Login user using Firebase ID token (no password check)."""
     try:
         decoded = firebase_auth.verify_id_token(request.firebase_token)
-        print("decoded dec ", decoded)
         user = await _get_or_create_user(
             decoded["uid"],
             decoded.get("email"),
@@ -260,22 +259,6 @@ async def login(request: FirebaseLoginRequest):
         logger.error(f"Login error: {e}")
         raise HTTPException(status_code=400, detail="Login failed")
 
-
-@router.post("/google", response_model=AuthResponse)
-async def google_auth(request: GoogleAuthRequest):
-    """Google/Firebase sign-in works the same as login."""
-    try:
-        decoded = firebase_auth.verify_id_token(request.firebase_token)
-        user = await _get_or_create_user(
-            decoded["uid"],
-            request.email or decoded.get("email"),
-            request.name,
-            decoded.get("email_verified", False)
-        )
-        return AuthResponse(user=UserResponse(**user), message="Google authentication successful")
-    except Exception as e:
-        logger.error(f"Google auth error: {e}")
-        raise HTTPException(status_code=400, detail="Google authentication failed")
 
 
 @router.get("/me", response_model=UserResponse)
