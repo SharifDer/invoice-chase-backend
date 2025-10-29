@@ -16,7 +16,6 @@ async def get_business_info(
     current_user: dict = Depends(get_current_user)
     ):
     user_id = current_user["user_id"]
-    user_id = 1
     record = await fetch_business_info(user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Business info not found")
