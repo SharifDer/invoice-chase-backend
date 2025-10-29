@@ -91,9 +91,7 @@ class ClientSettingsResponse(BaseModel):
     reminderIntervalDays : int
     reminderMinimumAmount : float
 # Invoice Responses
-class TransactionResponse(BaseModel):
-  message : str
-  status : str
+
 
 
 class TransCreationResponse(BaseModel):
@@ -106,7 +104,7 @@ class TransactionDetailsResponse(BaseModel):
     Description: Optional[str] = None
 
 class TransactionResponse(BaseModel):
-    transaction_number: str        ##transaction number not db id 
+    transaction_number: str        ##transaction id not db table id the one that's like TNX
     client_id: int
     client_name: str
     type: str               # "invoice" | "payment"
