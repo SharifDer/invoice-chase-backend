@@ -34,14 +34,22 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
 
     # Generate message
     if method == "email":
-        subject, html_content = generate_reminder_email(
+        subject, html_content, email_text = generate_reminder_email(
             business_name=client['business_name'],
             client_name=client["name"],
             balance=client["balance"],
             currency=client['currency'],
             urgent=urgent
         )
-        success = bool(await send_email(to_email=contact, subject=subject, html_content=html_content))
+        user_email = await Database.fetch_one(
+        "SELECT email FROM users WHERE user_id = ?",
+        (user_id,)
+    )
+        success = bool(await send_email(to_email=contact, subject=subject,
+                                         html_content=html_content,text_content=email_text,
+                                        from_email=settings.EMAIL_FROM_REMINDER
+                                         ,reply_to=user_email["email"]))
+
         if success :
                 await Database.execute(
                     "UPDATE users SET email_sent_count = email_sent_count + 1 WHERE id = ?",
@@ -99,7 +107,7 @@ async def send_test_email(
         html_content += "<p style='text-align:center; color:#9ca3af; font-size:13px;'>This is a <strong>test reminder email</strong> for preview purposes only.</p>"
 
     else:
-        subject, html_content = generate_transaction_email(
+        subject, html_content, email_text = generate_transaction_email(
             user_info["business_name"],
             user_info["name"],
             transaction_type="payment",
@@ -108,12 +116,13 @@ async def send_test_email(
         )
         html_content += "<p style='text-align:center; color:#9ca3af; font-size:13px;'>This is a <strong>test transaction notification</strong> for preview purposes only.</p>"
 
-    email_from = "onboarding@resend.dev"
+    email_from = settings.EMAIL_FROM_SYSTEM
 
     response = await send_email(
         to_email=user_info["email"],
         subject=subject,
         html_content=html_content,
+        text_content=email_text,
         from_email=email_from
     )
     if response :
@@ -338,7 +347,7 @@ async def send_automated_reminders(grace_minutes: int = 10):
             )
 
             # Update user's sent count
-            set_msgs_sent_count(communication_method=method , user_id=user_id)
+            await set_msgs_sent_count(communication_method=method , user_id=user_id)
             # Compute new reminder_next_date
             interval_days = await _get_effective_interval_days(user_id, c["id"])
             next_dt = (datetime.utcnow() + timedelta(days=interval_days)).replace(minute=0, second=0, microsecond=0)
