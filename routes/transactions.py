@@ -213,6 +213,7 @@ async def create_transaction(request: UnifiedTransactionRequest
     # Send notification
     await notify_transaction_creation(
         user_id=user_id,
+        user_email = current_user["email"],
         client_id=client_id,
         client_name=request.client.name if request.is_new_client else client["name"],
         transaction_type=request.transaction.type,
