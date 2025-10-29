@@ -23,7 +23,7 @@ async def get_transaction(
         trans_id: str,  # transaction_number
         current_user: dict = Depends(get_current_user)
     ):
-    user_id = current_user["id"]
+    user_id = current_user["user_id"]
     # user_id = 1
     trans_id = trans_id.strip('"').strip("'")
     transaction = await Database.fetch_one(
@@ -58,7 +58,7 @@ async def get_transactions(
     current_user: dict = Depends(get_current_user)
 ):
     """Get transactions for current user with filtering and pagination"""
-    user_id = current_user["id"]
+    user_id = current_user["user_id"]
     # user_id = 1
 
     # --- 1. Build WHERE clause dynamically ---

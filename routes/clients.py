@@ -104,7 +104,7 @@ async def get_client(client_id: int,
                     ):
     """Get a specific client by ID"""
     try:
-        user_id = current_user['id']
+        user_id = current_user['user_id']
         query = "SELECT * FROM clients WHERE id = ? AND user_id = ?"
         client = await Database.fetch_one(query, (client_id, user_id))
         
