@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import (APIRouter, Depends, 
+                     HTTPException, status, Query,
+                     BackgroundTasks)
 from datetime import datetime, date
 from decimal import Decimal
 import math
@@ -139,8 +141,10 @@ async def get_transactions(
     )
 
 @router.post("/create_transaction", response_model=TransCreationResponse)
-async def create_transaction(request: UnifiedTransactionRequest
-                             ,current_user: dict = Depends(get_current_user)
+async def create_transaction(request: UnifiedTransactionRequest,
+                            background_tasks: BackgroundTasks
+                             ,current_user: dict = Depends(get_current_user),
+                        
                              ):
     user_id = current_user["user_id"]
     # user_id = 1  # replace with current_user['user_id']
@@ -211,9 +215,10 @@ async def create_transaction(request: UnifiedTransactionRequest
     )
 
     # Send notification
-    await notify_transaction_creation(
+    background_tasks.add_task(
+        notify_transaction_creation,
         user_id=user_id,
-        user_email = current_user["email"],
+        user_email=current_user["email"],
         client_id=client_id,
         client_name=request.client.name if request.is_new_client else client["name"],
         transaction_type=request.transaction.type,
@@ -221,7 +226,6 @@ async def create_transaction(request: UnifiedTransactionRequest
         client_email=request.client.email if request.is_new_client else client["email"],
         client_phone=request.client.phone if request.is_new_client else client["phone"],
     )
-
     return TransCreationResponse(
         message="Transaction created successfully",
         status="Success"
