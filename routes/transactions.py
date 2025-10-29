@@ -243,7 +243,6 @@ async def update_invoice(
     # try:
     user_id = current_user['user_id']
     trans_id = trans_id.strip('"').strip("'")
-    user_id = 1
     # Check if invoice exists and belongs to user
     existing_transaction = await Database.fetch_one(
         "SELECT * FROM transactions WHERE transaction_number = ? AND user_id = ?",
@@ -328,7 +327,6 @@ async def delete_invoice(trans_id: str,
     try:
         user_id = current_user['user_id']
         trans_id = trans_id.strip('"').strip("'")
-        user_id = 1
         # Delete invoice
         await Database.execute(
             "DELETE FROM transactions WHERE transaction_number = ? AND user_id = ?",
