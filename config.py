@@ -16,6 +16,13 @@ class Settings:
     twilio_auth_token : str = ""
     twilio_number : str = ""
 
+    EMAIL_SUPPORT_INBOX = "Pursue Payments Support <support@pursuepayments.com>"
+    EMAIL_FROM_VERIFY = "Pursue Payments <verify@pursuepayments.com>"
+    EMAIL_FROM_SYSTEM = "Pursue Payments <system@pursuepayments.com>"
+
+    EMAIL_FROM_INVOICE = "Pursue Payments <invoices@pursuepayments.com>"
+    EMAIL_FROM_REMINDER = "Pursue Payments <reminders@pursuepayments.com>"
+    EMAIL_FROM_RECEIPT = "Pursue Payments <receipts@pursuepayments.com>"
     DEBUG: bool = "true"
     @classmethod
     def get_conf(cls):
