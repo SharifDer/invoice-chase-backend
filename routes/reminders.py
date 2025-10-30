@@ -9,7 +9,7 @@ from .utils import (
 from .remindersUtils import (send_sms, send_email, generate_transaction_email,
                              generate_reminder_email , generate_reminder_sms , generate_transaction_sms)
 
-from .dbUtils import get_client_effective_settings, set_msgs_sent_count
+from .dbUtils import get_client_effective_settings, set_msgs_sent_count, get_client_communication_method
 from datetime import datetime, timedelta
 from database import Database
 
@@ -21,16 +21,20 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
     Sends a single urgent reminder (email or SMS) for a client.
     Returns a dict suitable for results list.
     """
-    enabled, method, contact, reason = await get_client_effective_settings(user_id, client)
+    if urgent:
+      method, contact, _ = await get_client_communication_method(user_id=user_id , client=client)
+    
+    else :
+        enabled, method, contact, reason = await get_client_effective_settings(user_id, client)
 
-    if not enabled:
-        return {
-            "client_id": client["id"],
-            "success": False,
-            "method": method,
-            "sent_to": None,
-            "message": reason
-        }
+        if not enabled:
+            return {
+                "client_id": client["id"],
+                "success": False,
+                "method": method,
+                "sent_to": None,
+                "message": reason
+            }
 
     # Generate message
     if method == "email":
@@ -42,7 +46,7 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
             urgent=urgent
         )
         user_email = await Database.fetch_one(
-        "SELECT email FROM users WHERE user_id = ?",
+        "SELECT email FROM users WHERE id = ?",
         (user_id,)
     )
         success = bool(await send_email(to_email=contact, subject=subject,

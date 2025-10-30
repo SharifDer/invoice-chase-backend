@@ -4,6 +4,45 @@ from fastapi import HTTPException, status
 from logger import get_logger
 
 logger = get_logger(__name__)
+
+async def get_client_communication_method(user_id: int, client: dict):
+    """
+    Returns the effective communication method and contact for a client.
+    Output:
+        - method: 'email' or 'sms'
+        - contact: email address or phone number
+        - reason: (optional) string if no valid contact is found
+    """
+    # Fetch settings
+    client_settings = await Database.fetch_one(
+        "SELECT communication_method FROM client_settings WHERE user_id = ? AND client_id = ?",
+        (user_id, client["id"])
+    )
+    user_settings = await Database.fetch_one(
+        "SELECT communication_method FROM user_settings WHERE user_id = ?",
+        (user_id,)
+    )
+
+    # Determine effective method
+    method = (
+        client_settings.get("communication_method")
+        if client_settings and client_settings.get("communication_method")
+        else (user_settings.get("communication_method") if user_settings else "email")
+    )
+
+    # Determine contact
+    contact = None
+    if method == "email":
+        contact = client.get("email")
+        if not contact:
+            return None, None, "Client has no email"
+    elif method == "sms":
+        contact = client.get("phone")
+        if not contact:
+            return None, None, "Client has no phone"
+
+    return method, contact, None
+
 async def get_client_effective_settings(user_id: int, client: dict):
     """
     Determine if reminders are enabled for this client and which method to use.
