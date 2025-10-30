@@ -321,7 +321,8 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 15) -> AgingBa
             FROM clients c
             WHERE c.user_id = ?
         )
-        SELECT 
+        SELECT
+            id, 
             name,
             company,
             balance,
@@ -350,6 +351,7 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 15) -> AgingBa
 
         clients = [
             AgingBalanceClientData(
+                client_id=r["id"],
                 name=r["name"],
                 company=r["company"] or "",
                 balance=float(r["balance"]),

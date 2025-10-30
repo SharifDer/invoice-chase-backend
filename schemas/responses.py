@@ -187,6 +187,7 @@ class TopClientByBalanceData(BaseModel):
 
 
 class AgingBalanceClientData(BaseModel):
+    client_id : int
     name: str
     company: str
     balance: float
