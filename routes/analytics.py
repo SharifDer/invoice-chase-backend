@@ -288,9 +288,12 @@ async def _get_top_clients_by_balance(user_id: int, limit: int = 5) -> List[TopC
 
 
 
-async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBalancesData:
+async def _get_aging_balances(user_id: int, days_threshold: int = 15) -> AgingBalancesData:
     """
-    Get clients with aging balances (no payment in 30+ days and have outstanding balance)
+    Get clients with aging balances:
+    - Owe money (balance > 0)
+    - No payment in >= days_threshold
+    - Ignores fresh invoices less than days_threshold old
     """
     try:
         query = """
@@ -304,11 +307,17 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBa
                               WHERE client_id = c.id AND type = 'invoice'), 0) -
                     COALESCE((SELECT SUM(amount) FROM transactions 
                               WHERE client_id = c.id AND type = 'payment'), 0)
-                ) as balance,
+                ) AS balance,
                 (
-                    SELECT MAX(created_date) FROM transactions 
+                    SELECT MAX(created_date)
+                    FROM transactions 
                     WHERE client_id = c.id AND type = 'payment'
-                ) as last_payment_date
+                ) AS last_payment_date,
+                (
+                    SELECT MIN(created_date)
+                    FROM transactions 
+                    WHERE client_id = c.id AND type = 'invoice'
+                ) AS first_invoice_date
             FROM clients c
             WHERE c.user_id = ?
         )
@@ -317,37 +326,46 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBa
             company,
             balance,
             CASE 
-                WHEN last_payment_date IS NULL THEN 999
-                ELSE CAST(julianday('now') - julianday(last_payment_date) AS INTEGER)
-            END as days_since_payment
+                WHEN last_payment_date IS NULL THEN 
+                    CAST(julianday('now') - julianday(first_invoice_date) AS INTEGER)
+                ELSE 
+                    CAST(julianday('now') - julianday(last_payment_date) AS INTEGER)
+            END AS days_since_payment
         FROM client_balances
         WHERE balance > 0
         AND (
-            last_payment_date IS NULL 
-            OR julianday('now') - julianday(last_payment_date) >= ?
+            (last_payment_date IS NULL AND first_invoice_date IS NOT NULL 
+             AND julianday('now') - julianday(first_invoice_date) >= ?)
+            OR (last_payment_date IS NOT NULL 
+                AND julianday('now') - julianday(last_payment_date) >= ?)
         )
         ORDER BY balance DESC
         """
-        results = await Database.fetch_all(query, (user_id, days_threshold))
         
-        clients = []
-        
-        for result in results:
-            clients.append(AgingBalanceClientData(
-                name=result['name'],
-                company=result['company'] or "",
-                balance=float(result['balance']),
-                daysSincePayment=result['days_since_payment']
-            ))
-        
+        results = await Database.fetch_all(query, (user_id, days_threshold, days_threshold))
+
+        # Handle empty results gracefully
+        if not results:
+            return AgingBalancesData(count=0, clients=[])
+
+        clients = [
+            AgingBalanceClientData(
+                name=r["name"],
+                company=r["company"] or "",
+                balance=float(r["balance"]),
+                daysSincePayment=r["days_since_payment"] or 0
+            )
+            for r in results
+        ]
+
         return AgingBalancesData(
             count=len(clients),
             clients=clients
         )
-    
+
     except Exception as e:
         logger.error(f"Error fetching aging balances: {e}")
-        return AgingBalancesData(count=0, totalAmount=0.0, clients=[])
+        return AgingBalancesData(count=0, clients=[])
 
 
 async def _get_net_cash_change(user_id: int, days: int) -> NetCashChangeData:
