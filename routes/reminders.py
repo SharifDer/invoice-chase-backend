@@ -21,6 +21,9 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
     Sends a single urgent reminder (email or SMS) for a client.
     Returns a dict suitable for results list.
     """
+    success = False
+    method = None
+    contact = None
     if urgent:
       method, contact, _ = await get_client_communication_method(user_id=user_id , client=client)
     
@@ -73,6 +76,15 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
                     "UPDATE users SET sms_sent_count = sms_sent_count + 1 WHERE id = ?",
                     (user_id,)
                 )
+    else :
+        return {
+            "client_id": client["id"],
+            "success": False,
+            "method": method,
+            "sent_to": None,
+            "message": f"Unknown communication method: {method}"
+        }
+
 
     return {
         "client_id": client["id"],
