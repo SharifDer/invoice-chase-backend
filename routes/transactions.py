@@ -197,7 +197,7 @@ async def create_transaction(request: UnifiedTransactionRequest,
         float(request.transaction.amount),
         request.transaction.type,
         description,
-        date.today()
+        request.transaction.created_date
     ))
 
     # Get new transaction ID

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field,model_validator
 from typing import Optional,Literal, List
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from fastapi import Query
 # ======================
@@ -63,6 +63,7 @@ class TransactionCreateRequest(BaseModel):
     type: Literal['payment', 'invoice']
     amount: Decimal = Field(..., gt=0)
     description: Optional[str] = None
+    created_date : date
 
    
 class UnifiedTransactionRequest(BaseModel):
