@@ -167,13 +167,14 @@ async def get_user_business_info(user_id: int):
     currency = user_data.get("currency", "$")
 
     business_info = await Database.fetch_one(
-        "SELECT business_name FROM business_info WHERE user_id = ?", (user_id,)
+        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
     )
     business_name = business_info["business_name"] if business_info else user_name
-
+    phone = business_info["phone"] if business_info else None
     return {
         "name": user_name,
         "email": user_email,
+        "phone" : phone,
         "business_name": business_name,
         "currency": currency
     }
