@@ -129,5 +129,7 @@ async def update_notification_settings(data: NotificationSettings,
 
 async def fetch_notification_settings(user_id) :
     record = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
+    if record is None:
+        return {} 
     settings = {k: v for k, v in record.items() if v is not None}
     return settings
