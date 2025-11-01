@@ -58,10 +58,8 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
                                          ,reply_to=user_email["email"]))
 
         if success :
-                await Database.execute(
-                    "UPDATE users SET email_sent_count = email_sent_count + 1 WHERE id = ?",
-                    (user_id,)
-                )
+           await set_msgs_sent_count(user_id , communication_method=method , msg_type="reminder")
+
     elif method == "sms":
         body = generate_reminder_sms(
             business_name=client['business_name'],
@@ -72,10 +70,7 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
         )
         success = bool(await send_sms(to_number=contact, body=body))
         if success :
-               await Database.execute(
-                    "UPDATE users SET sms_sent_count = sms_sent_count + 1 WHERE id = ?",
-                    (user_id,)
-                )
+            await set_msgs_sent_count(user_id , communication_method=method , msg_type="reminder")
     else :
         return {
             "client_id": client["id"],
@@ -142,10 +137,7 @@ async def send_test_email(
         from_email=email_from
     )
     if response :
-        await Database.execute(
-            "UPDATE users SET email_sent_count = email_sent_count + 1 WHERE id = ?",
-            (user_id,)
-                )
+        await set_msgs_sent_count(user_id , communication_method="email" , msg_type=request.type)
     return TestReminderRes(
         status="Success" if response else "Failed",
         message="Test email sent successfully" if response else "Failed to send test email",
@@ -194,10 +186,7 @@ async def send_test_sms(request: EmailSendReq,
         body=body
     )
     if sid :
-        await Database.execute(
-            "UPDATE users SET sms_sent_count = sms_sent_count + 1 WHERE id = ?",
-            (user_id,)
-            )
+        await set_msgs_sent_count(user_id , communication_method="sms" , msg_type=request.type)
 
     return TestReminderRes(
         status="Success" if sid else "Failed",
@@ -362,8 +351,6 @@ async def send_automated_reminders(grace_minutes: int = 10):
                 (c["id"],)
             )
 
-            # Update user's sent count
-            await set_msgs_sent_count(communication_method=method , user_id=user_id)
             # Compute new reminder_next_date
             interval_days = await _get_effective_interval_days(user_id, c["id"])
             next_dt = (datetime.utcnow() + timedelta(days=interval_days)).replace(minute=0, second=0, microsecond=0)

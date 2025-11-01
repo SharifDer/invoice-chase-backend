@@ -105,3 +105,4 @@ class BusinessNameCurrency(BaseModel):
     business_name : str
     currency : str
     currency_symbol : str
+    plan_type : str

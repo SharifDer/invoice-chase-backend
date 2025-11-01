@@ -1,5 +1,5 @@
 from database import Database
-
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from logger import get_logger
 
@@ -159,18 +159,47 @@ async def apply_custom_client_settings(user_id: int, client_id: int, ns):
     )
 
 
-async def set_msgs_sent_count(communication_method : str , user_id : int):
+
+async def set_msgs_sent_count(user_id: int, communication_method: str, msg_type: str):
+    """
+    Increment the user's SMS/email count for the current month using UPSERT.
     
-    if communication_method == "email" :
-         await Database.execute(
-                    "UPDATE users SET email_sent_count = email_sent_count + 1 WHERE id = ?",
-                    (user_id,)
-                )
+    :param user_id: ID of the user
+    :param communication_method: "email" or "sms"
+    :param msg_type: "reminder" or "notification"
+    """
+    now = datetime.now(timezone.utc)  # timezone-aware UTC datetime
+    year = now.year
+    month = now.month
+
+    # Determine which column to increment
+    if communication_method == "email":
+        if msg_type == "reminder":
+            column = "email_reminders_sent_count"
+        elif msg_type == "notification":
+            column = "email_notifications_sent_count"
+        else:
+            raise ValueError("Invalid msg_type for email")
     elif communication_method == "sms":
-        await Database.execute(
-            "UPDATE users SET sms_sent_count = sms_sent_count + 1 WHERE id = ?",
-            (user_id,)
-        )
+        if msg_type == "reminder":
+            column = "sms_reminders_sent_count"
+        elif msg_type == "notification":
+            column = "sms_notifications_sent_count"
+        else:
+            raise ValueError("Invalid msg_type for sms")
+    else:
+        raise ValueError("Invalid communication_method")
+
+    # UPSERT: insert if not exists, else increment counter
+    await Database.execute(
+        f"""
+        INSERT INTO user_monthly_usage (user_id, year, month, {column})
+        VALUES (?, ?, ?, 1)
+        ON CONFLICT(user_id, year, month)
+        DO UPDATE SET {column} = {column} + 1
+        """,
+        (user_id, year, month)
+    )
 
 
 async def fetch_user_currency(user_id : int):

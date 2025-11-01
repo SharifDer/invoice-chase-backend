@@ -232,11 +232,14 @@ async def set_business_name_currency(
         SET 
             currency = ?,
             currency_symobl = ?,
+            plan_type = ?
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?;
     """
 
-    await Database.execute(insert_business_sql, (user_id, request.business_name))
-    await Database.execute(update_user_currency_sql, (request.currency, request.currency_symbol, user_id))
+    await Database.execute_batch([
+        (insert_business_sql, (user_id, request.business_name)),
+        (update_user_currency_sql, (request.currency, request.currency_symbol,request.plan_type ,  user_id))
+    ])
 
     return {"message": "Business name and currency updated successfully"}

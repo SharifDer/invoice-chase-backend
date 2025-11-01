@@ -339,6 +339,6 @@ async def notify_transaction_creation(
                               text_content=email_text,
                               from_email=email_from, reply_to=user_email)
             # logger.info(f"✅ Email notification sent to {client_email} for {transaction_type}")
-        await set_msgs_sent_count(communication_method , user_id)
+        await set_msgs_sent_count(user_id , communication_method , msg_type="notification")
     except Exception as e:
         logger.error(f"❌ Failed to send transaction notification: {e}")
