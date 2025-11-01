@@ -6,6 +6,8 @@ from datetime import date, timedelta
 from .dbUtils import fetch_user_currency
 from auth import get_current_user
 from schemas.requests import BusinessNameCurrency
+from datetime import datetime, timedelta, timezone
+
 router = APIRouter()
 
 
@@ -213,6 +215,7 @@ async def set_business_name_currency(
     user_id = current_user["user_id"]
 
     # 1️⃣ Insert or update business name in business_info table
+    trial_end_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
     insert_business_sql = """
         INSERT INTO business_info (
             user_id,
@@ -233,13 +236,16 @@ async def set_business_name_currency(
             currency = ?,
             currency_symobl = ?,
             plan_type = ?,
+            trial_end_date = COALESCE(trial_end_date, ?),
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?;
     """
 
     await Database.execute_batch([
         (insert_business_sql, (user_id, request.business_name)),
-        (update_user_currency_sql, (request.currency, request.currency_symbol,request.plan_type ,  user_id))
+        (update_user_currency_sql, (request.currency, request.currency_symbol,
+                                    request.plan_type ,trial_end_date,
+                                    user_id))
     ])
 
     return {"message": "Business name and currency updated successfully"}

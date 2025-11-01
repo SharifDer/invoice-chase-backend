@@ -106,3 +106,6 @@ class BusinessNameCurrency(BaseModel):
     currency : str
     currency_symbol : str
     plan_type : str
+
+class UpdateUserPlan(BaseModel):
+    plan_type : str

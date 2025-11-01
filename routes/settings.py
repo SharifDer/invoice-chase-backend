@@ -3,7 +3,9 @@ from typing import Optional
 from database import Database
 from auth import get_current_user
 from logger import get_logger
-from schemas.responses import (BusinessDataRes, NotificationSettings)
+from schemas.responses import (BusinessDataRes, NotificationSettings,
+                               BaseResponse)
+from schemas.requests import UpdateUserPlan
 from .utils import fetch_business_info
 logger = get_logger(__name__)
 router = APIRouter( tags=["Settings"])
@@ -126,6 +128,30 @@ async def update_notification_settings(data: NotificationSettings,
         )
 
     return await fetch_notification_settings(user_id)
+
+
+@router.put("/update_user_plan", response_model=BaseResponse)
+async def update_user_plan(
+    request: UpdateUserPlan,
+    current_user: dict = Depends(get_current_user)
+):
+    """Allow user to change plan type (no payment logic yet)."""
+    user_id = current_user["user_id"]
+
+    sql = """
+        UPDATE users
+        SET 
+            plan_type = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?;
+    """
+
+    try:
+        await Database.execute(sql, (request.plan_type, user_id))
+        return BaseResponse(success=True, message="Plan updated successfully")
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Failed to update plan: {str(e)}")
+    
 
 async def fetch_notification_settings(user_id) :
     record = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
