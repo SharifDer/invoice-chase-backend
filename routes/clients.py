@@ -153,7 +153,7 @@ async def create_client(
     return ClientResponse(**created_client)
 
 
-@router.put("/update_client/{client_id}", response_model=ClientResponse)
+@router.put("/update_client/{client_id}", response_model=BaseResponse)
 async def update_client(
     client_id: int,
     request: ClientUpdateRequest,
@@ -278,14 +278,17 @@ async def update_client(
     # --------------------------------------------
 
     # Get updated client
-    updated_client = await Database.fetch_one(
-        "SELECT * FROM clients WHERE id = ? AND user_id = ?",
-        (client_id, user_id)
-    )
+    # updated_client = await Database.fetch_one(
+    #     "SELECT * FROM clients WHERE id = ? AND user_id = ?",
+    #     (client_id, user_id)
+    # )
     
     logger.info(f"Client and settings updated: {client_id} for user {user_id}")
 
-    return ClientResponse(**updated_client)
+    return BaseResponse(
+        success=True,
+        message="Client data has been updated successfully"
+    )
   
     
     # return ClientResponse(**updated_client)

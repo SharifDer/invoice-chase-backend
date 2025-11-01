@@ -94,7 +94,7 @@ class TransactionUpdateRequest(BaseModel):
 # ======================
 
 class EmailSendReq(BaseModel):
-    type : str        #balance reminder or transaction notifcation creation so the filed either reminder or notification
+    type: Literal["reminder", "notification"]        #balance reminder or transaction notifcation creation so the filed either reminder or notification
 
 class UrgentReminderReq(BaseModel):
     client_ids: List[int]  

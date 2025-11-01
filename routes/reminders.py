@@ -180,7 +180,7 @@ async def send_test_sms(request: EmailSendReq,
             urgent=False
         )
         body += " [This is a test reminder SMS for preview purposes only.]"
-    else:
+    elif request.type == "notification":
         body = generate_transaction_sms(
             business_name=user_info["business_name"],
             client_name=user_info["name"],
