@@ -85,11 +85,11 @@ class ClientReportResponse(BaseModel):
     total_pages: int
     business_profile: Optional[BusinessProfile] = None 
 class ClientSettingsResponse(BaseModel):
-    communicationMethod : str
-    transactionNotificationEnabled : bool
-    reminderEnabled : bool
-    reminderIntervalDays : int
-    reminderMinimumAmount : float
+    communicationMethod : Optional[str]
+    transactionNotificationEnabled : Optional[bool]
+    reminderEnabled : Optional[bool]
+    reminderIntervalDays : Optional[int]
+    reminderMinimumAmount : Optional[float]
 # Invoice Responses
 
 
