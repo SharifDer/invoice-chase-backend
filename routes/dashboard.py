@@ -232,7 +232,7 @@ async def set_business_name_currency(
         SET 
             currency = ?,
             currency_symobl = ?,
-            plan_type = ?
+            plan_type = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?;
     """
