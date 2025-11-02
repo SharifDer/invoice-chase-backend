@@ -158,8 +158,6 @@ class MonthlyUsageStats(BaseModel):
     sms_sent: int
     sms_limit: int
     sms_left: int
-    plan_type: str
-    trial_end_date: Optional[datetime] = None
 
 class DashboardStatsResponse(BaseModel):
     total_invoices: int
@@ -168,7 +166,9 @@ class DashboardStatsResponse(BaseModel):
     total_receipts_amount: float
     todayMomentum: TodayMomentum
     recent_transactions: List[TransactionSummary]
-    monthly_usage: Optional[MonthlyUsageStats] = None
+    plan_type: str
+    trial_end_date: Optional[datetime] = None
+    # monthly_usage: Optional[MonthlyUsageStats] = None
 
 
   
@@ -232,6 +232,7 @@ class AnalyticsResponse(BaseModel):
     topClientsByBalance: List[TopClientByBalanceData]
     agingBalances: AgingBalancesData
     netCashChange: NetCashChangeData
+    monthly_usage: Optional[MonthlyUsageStats] = None
 # Settings Responses
 # --- MODELS --- #
 class BusinessDataRes(BaseModel):

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import List, Literal, Optional
-
+from .dbUtils import get_user_monthly_usage
 from database import Database
 from auth import get_current_user
 from schemas.responses import (
@@ -14,7 +14,8 @@ from schemas.responses import (
     TopClientByBalanceData,
     AgingBalancesData,
     AgingBalanceClientData,
-    NetCashChangeData
+    NetCashChangeData,
+    MonthlyUsageStats
 )
 from logger import get_logger
 
@@ -61,7 +62,8 @@ async def get_analytics(
     top_clients_by_balance = await _get_top_clients_by_balance(user_id)
     aging_balances = await _get_aging_balances(user_id)
     net_cash_change = await _get_net_cash_change(user_id, days)
-    
+
+    monthly_usage = await get_user_monthly_usage(user_id , current_user)
     logger.info(f"Analytics data retrieved successfully for user {user_id}")
     
     return AnalyticsResponse(
@@ -71,7 +73,8 @@ async def get_analytics(
         weeklyCashFlow=weekly_cash_flow,
         topClientsByBalance=top_clients_by_balance,
         agingBalances=aging_balances,
-        netCashChange=net_cash_change
+        netCashChange=net_cash_change,
+        monthly_usage=monthly_usage
     )
 
 

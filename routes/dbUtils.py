@@ -246,13 +246,11 @@ async def get_user_monthly_usage(user_id: int , user_data : dict) -> MonthlyUsag
         }
 
     plan = user_data["plan_type"]
-    trial_end = user_data["trial_end_date"]
-
     sms_limits = settings.sms_limits
 
     sms_limit = sms_limits.get(plan.lower(), 0)
 
-    MonthlyUsageStats(
+    return MonthlyUsageStats(
     reminders_sent_this_month=row["sms_reminders_sent_count"] + row["email_reminders_sent_count"],
     sms_reminders_sent_this_month = row["sms_reminders_sent_count"] ,
     email_reminders_sent_this_month = row["email_reminders_sent_count"],
@@ -263,8 +261,6 @@ async def get_user_monthly_usage(user_id: int , user_data : dict) -> MonthlyUsag
     sms_sent=row["total_sms_sent"],
     sms_limit=sms_limit,
     sms_left=max(0, sms_limit - row["total_sms_sent"]),
-    plan_type=plan,
-    trial_end_date=trial_end
 )
      
 

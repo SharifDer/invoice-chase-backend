@@ -152,17 +152,16 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     """
     user_id = current_user["user_id"]
     totals = await get_total_stats(user_id)
-
+    plan = current_user["plan_type"]
+    trial_end = current_user["trial_end_date"]
     # --- Optimization (1): short-circuit for users with no transactions ---
     if (
         totals["total_invoices"] == 0
         and totals["total_receipts_amount"] == 0
     ):
-        plan = current_user["plan_type"]
-        trial_end = current_user["trial_end_date"]
-        sms_limits = settings.sms_limits
+        # sms_limits = settings.sms_limits
 
-        sms_limit = sms_limits.get(plan.lower(), 0)
+        # sms_limit = sms_limits.get(plan.lower(), 0)
 
         return DashboardStatsResponse(
             total_invoices=0,
@@ -181,27 +180,16 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
                 lastWeekInvoices=0,
                 lastWeekPayments=0,
             ),
-            recent_transactions=[],
-            monthly_usage=MonthlyUsageStats(
-                    reminders_sent_this_month = 0,
-                    sms_reminders_sent_this_month = 0 ,
-                    email_reminders_sent_this_month = 0,
-                    notifications_sent_this_month = 0 ,
-                    sms_notifications_sent_this_month = 0,
-                    email_notifications_sent_this_month = 0,
-                    emails_sent = 0,
-                    sms_sent = 0,
-                    sms_limit = 0,
-                    sms_left = sms_limit,
-                    plan_type = plan,
-                    trial_end_date = trial_end
-            )
+            recent_transactions=[],    
+            plan_type = plan,
+            trial_end_date = trial_end
+            
         )
 
     # --- Normal flow for existing users ---
     today_momentum = await get_today_momentum(user_id)
     recent_transactions = await get_recent_transactions(user_id)
-    user_monthly_usage = await get_user_monthly_usage(user_id , current_user)
+    # user_monthly_usage = await get_user_monthly_usage(user_id , current_user)
 
     return DashboardStatsResponse(
         total_invoices=totals["total_invoices"],
@@ -210,7 +198,8 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         total_receipts_amount=totals["total_receipts_amount"],
         todayMomentum=today_momentum,
         recent_transactions=recent_transactions,
-        monthly_usage=user_monthly_usage
+        plan_type = plan,
+        trial_end_date = trial_end
     )
 
 
