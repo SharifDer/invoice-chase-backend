@@ -144,6 +144,22 @@ class TodayMomentum(BaseModel):
     thisWeekPayments: int
     lastWeekInvoices: int
     lastWeekPayments: int
+class MonthlyUsageStats(BaseModel):
+    """
+    Pydantic model for representing user usage statistics and plan details.
+    """
+    reminders_sent_this_month: int ## This field is the sum of sms_reminders_sent_this_month : int + email_reminders_sent_this_month : int
+    sms_reminders_sent_this_month : int
+    email_reminders_sent_this_month : int
+    notifications_sent_this_month: int ## This field is the sum of sms_notifications_sent_this_month : int + email_notifications_sent_this_month : int
+    sms_notifications_sent_this_month : int
+    email_notifications_sent_this_month : int
+    emails_sent: int
+    sms_sent: int
+    sms_limit: int
+    sms_left: int
+    plan_type: str
+    trial_end_date: Optional[datetime] = None
 
 class DashboardStatsResponse(BaseModel):
     total_invoices: int
@@ -152,7 +168,11 @@ class DashboardStatsResponse(BaseModel):
     total_receipts_amount: float
     todayMomentum: TodayMomentum
     recent_transactions: List[TransactionSummary]
+    monthly_usage: Optional[MonthlyUsageStats] = None
 
+
+  
+     
 class CurrencyResponse(BaseModel):
     currency_symbol : str 
     currency_name : str

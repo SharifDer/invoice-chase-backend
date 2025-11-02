@@ -3,7 +3,7 @@ from database import Database
 from schemas.responses import (DashboardStatsResponse, TransactionSummary,
                                CurrencyResponse, TodayMomentum)
 from datetime import date, timedelta
-from .dbUtils import fetch_user_currency
+from .dbUtils import fetch_user_currency, get_user_monthly_usage
 from auth import get_current_user
 from schemas.requests import BusinessNameCurrency
 from datetime import datetime, timedelta, timezone
@@ -180,6 +180,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     # --- Normal flow for existing users ---
     today_momentum = await get_today_momentum(user_id)
     recent_transactions = await get_recent_transactions(user_id)
+    user_monthly_usage = await get_user_monthly_usage(user_id , current_user)
 
     return DashboardStatsResponse(
         total_invoices=totals["total_invoices"],
@@ -188,6 +189,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         total_receipts_amount=totals["total_receipts_amount"],
         todayMomentum=today_momentum,
         recent_transactions=recent_transactions,
+        monthly_usage=user_monthly_usage
     )
 
 

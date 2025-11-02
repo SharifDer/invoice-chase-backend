@@ -9,18 +9,22 @@ from .utils import (
 from .remindersUtils import (send_sms, send_email, generate_transaction_email,
                              generate_reminder_email , generate_reminder_sms , generate_transaction_sms)
 
-from .dbUtils import get_client_effective_settings, set_msgs_sent_count, get_client_communication_method
-from datetime import datetime, timedelta
+from .dbUtils import (get_client_effective_settings, set_msgs_sent_count,
+                       get_client_communication_method, get_users_data_by_ids,
+                       get_business_names_by_user_ids)
+from datetime import datetime, timedelta, timezone
 from database import Database
+from Utils.rules import can_send_email, can_send_sms
 
 router = APIRouter()
 
 
-async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
+async def send_reminder_for_client(client: dict, user_data : dict, urgent=False):
     """
     Sends a single urgent reminder (email or SMS) for a client.
     Returns a dict suitable for results list.
     """
+    user_id = user_data["user_id"]
     success = False
     method = None
     contact = None
@@ -41,31 +45,43 @@ async def send_reminder_for_client(client: dict, user_id: int, urgent=False):
 
     # Generate message
     if method == "email":
+        if not await can_send_email(user_id , user_data["plan_type"]):
+            return {
+                "client_id": client["id"],
+                "success": False,
+                "method": method,
+                "sent_to": None,
+                "message": "You have exeeded the limits to sends Emails, Please Upgrade"
+            }
         subject, html_content, email_text = generate_reminder_email(
             business_name=client['business_name'],
             client_name=client["name"],
             balance=client["balance"],
             currency=client['currency'],
             urgent=urgent
-        )
-        user_email = await Database.fetch_one(
-        "SELECT email FROM users WHERE id = ?",
-        (user_id,)
-    )
+        )  
         success = bool(await send_email(to_email=contact, subject=subject,
                                          html_content=html_content,text_content=email_text,
                                         from_email=settings.EMAIL_FROM_REMINDER
-                                         ,reply_to=user_email["email"]))
+                                         ,reply_to=user_data["email"]))
 
         if success :
            await set_msgs_sent_count(user_id , communication_method=method , msg_type="reminder")
 
     elif method == "sms":
+        if not await can_send_sms(user_id , user_data["plan_type"]):
+            return {
+                "client_id": client["id"],
+                "success": False,
+                "method": method,
+                "sent_to": None,
+                "message": "You have exeeded the limits to sends sms messages, Please Upgrade"
+            }
         body = generate_reminder_sms(
             business_name=client['business_name'],
             client_name=client["name"],
             balance=client["balance"],
-            currency=client['currency'],
+            currency=user_data['currency'],
             urgent=urgent
         )
         success = bool(await send_sms(to_number=contact, body=body))
@@ -99,6 +115,11 @@ async def send_test_email(
 ):
     # user_id = 1 
     user_id = current_user["user_id"]
+    if not await can_send_email(user_id , plan_type=current_user["plan_type"]):
+        return TestReminderRes(
+            status="Failed",
+            message="You reached your limits of number of emails sent"
+        )
     user_info = await get_user_business_info(user_id)
 
     if not user_info:
@@ -155,6 +176,11 @@ async def send_test_sms(request: EmailSendReq,
                         ):
     # user_id = 1
     user_id = current_user["user_id"]
+    if not await can_send_sms(user_id , plan_type=current_user["plan_type"]):
+        return TestReminderRes(
+            status="Failed",
+            message="You reached your limits of number of sms sent"
+        )
     user_info = await get_user_business_info(user_id)
 
     if not user_info or not user_info.get("phone"):
@@ -198,13 +224,13 @@ async def send_test_sms(request: EmailSendReq,
 async def send_urgent_reminders(request: UrgentReminderReq,
                                 current_user = Depends(get_current_user)
                                 ):
-    user_id = current_user['user_id']
+    # user_id = current_user['user_id']
     # user_id = 1 
-    clients = await get_clients_balance(user_id, request.client_ids)
+    clients = await get_clients_balance(current_user, request.client_ids)
 
     results = []
     for client in clients:
-        result = await send_reminder_for_client(client, user_id, urgent=True)
+        result = await send_reminder_for_client(client, current_user, urgent=True)
         results.append(result)
 
     return {
@@ -223,7 +249,7 @@ async def _fetch_candidates_due(grace_minutes: int = 10):
     """
     Fetch candidate clients whose reminder_next_date is due (client_settings or user_settings fallback).
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     hour_fragment = now.strftime("%Y-%m-%dT%H")
     cutoff = (now + timedelta(minutes=grace_minutes)).isoformat()
 
@@ -285,13 +311,18 @@ async def send_automated_reminders(grace_minutes: int = 10):
     Runs periodically (e.g. hourly). Finds clients due for reminder (same hour or within grace window).
     Respects user/client settings, increments counts, and updates appropriate next_date.
     """
-    now = datetime.utcnow()
+
     results = []
     candidates = await _fetch_candidates_due(grace_minutes=grace_minutes)
+    unique_user_ids = list({c["user_id"] for c in candidates})
+
+    users_map = await get_users_data_by_ids(unique_user_ids)
+
+    business_map = await get_business_names_by_user_ids(unique_user_ids)
 
     for c in candidates:
         user_id = c["user_id"]
-
+  
         # Get user's minimum balance
         # Determine effective minimum balance (client -> user fallback)
         client_min_row = await Database.fetch_one(
@@ -340,9 +371,10 @@ async def send_automated_reminders(grace_minutes: int = 10):
                 "message": "No communication method configured (client/user)"
             })
             continue
-
+        user_data = users_map.get(user_id)
+        c["business_name"] = business_map.get(user_id) or user_data["name"]
         # Send reminder using existing shared function
-        send_result = await send_reminder_for_client(c, user_id, urgent=False)
+        send_result = await send_reminder_for_client(c, user_data, urgent=False)
 
         if send_result.get("success"):
             # Update reminder_last_sent in clients table
@@ -353,7 +385,7 @@ async def send_automated_reminders(grace_minutes: int = 10):
 
             # Compute new reminder_next_date
             interval_days = await _get_effective_interval_days(user_id, c["id"])
-            next_dt = (datetime.utcnow() + timedelta(days=interval_days)).replace(minute=0, second=0, microsecond=0)
+            next_dt = (datetime.now(timezone.utc) + timedelta(days=interval_days)).replace(minute=0, second=0, microsecond=0)
 
             # Determine which table to update (client_settings if exists, else user_settings)
             client_has_settings = await Database.fetch_one(

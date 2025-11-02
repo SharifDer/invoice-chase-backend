@@ -2,6 +2,8 @@ from database import Database
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from logger import get_logger
+from schemas.responses import MonthlyUsageStats
+from config import settings
 
 logger = get_logger(__name__)
 
@@ -211,4 +213,117 @@ async def fetch_user_currency(user_id : int):
          "currency_symbol" : currency["currency_symobl"],
          "currency_name" : currency["currency"]
     }
-      
+
+
+
+
+
+async def get_user_monthly_usage(user_id: int , user_data : dict) -> MonthlyUsageStats:
+
+    now = datetime.now(timezone.utc)
+    year, month = now.year, now.month
+
+    # Get usage record for this month
+    sql = """
+        SELECT 
+            sms_reminders_sent_count + sms_notifications_sent_count AS total_sms_sent,
+            email_reminders_sent_count + email_notifications_sent_count AS total_email_sent,
+            sms_reminders_sent_count, sms_notifications_sent_count,
+            email_reminders_sent_count, email_notifications_sent_count
+        FROM user_monthly_usage
+        WHERE user_id = ? AND year = ? AND month = ?;
+    """
+    row = await Database.fetch_one(sql, (user_id, year, month))
+    if not row:
+        # No record means 0 usage
+        row = {
+            "total_sms_sent": 0,
+            "total_email_sent": 0,
+            "sms_reminders_sent_count": 0,
+            "sms_notifications_sent_count": 0,
+            "email_reminders_sent_count": 0,
+            "email_notifications_sent_count": 0
+        }
+
+    plan = user_data["plan_type"]
+    trial_end = user_data["trial_end_date"]
+
+    sms_limits = settings.sms_limits
+
+    sms_limit = sms_limits.get(plan.lower(), 0)
+
+    MonthlyUsageStats(
+    reminders_sent_this_month=row["sms_reminders_sent_count"] + row["email_reminders_sent_count"],
+    sms_reminders_sent_this_month = row["sms_reminders_sent_count"] ,
+    email_reminders_sent_this_month = row["email_reminders_sent_count"],
+    notifications_sent_this_month=row["sms_notifications_sent_count"] + row["email_notifications_sent_count"],
+    sms_notifications_sent_this_month = row["sms_notifications_sent_count"] ,
+    email_notifications_sent_this_month = row["email_notifications_sent_count"],
+    emails_sent=row["total_email_sent"],
+    sms_sent=row["total_sms_sent"],
+    sms_limit=sms_limit,
+    sms_left=max(0, sms_limit - row["total_sms_sent"]),
+    plan_type=plan,
+    trial_end_date=trial_end
+)
+     
+
+async def get_user_data_by_id(user_id : int):
+    user_info = await Database.fetch_one(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,))
+    return {
+        "user_id" : user_info["id"],
+        "firebase_id": user_info["uid"],
+        "name": user_info.get("name", user_info.get("email", "")),
+        "email": user_info.get("email", None),
+        "currency" : user_info["currency"],
+        "currency_symobl" : user_info["currency_symobl"],
+        "plan_type" : user_info["plan_type"],
+        "trial_end_date" : user_info["trial_end_date"],
+
+    }
+
+
+async def get_users_data_by_ids(user_ids: list[int]) -> dict[int, dict]:
+    """
+    Fetch multiple users' data in one query.
+    Returns a dictionary keyed by user_id.
+    """
+    if not user_ids:
+        return {}
+
+    placeholders = ",".join(["?"] * len(user_ids))
+    query = f"SELECT * FROM users WHERE id IN ({placeholders})"
+    rows = await Database.fetch_all(query, tuple(user_ids))
+
+    user_map = {}
+    for user_info in rows:
+        user_map[user_info["id"]] = {
+            "user_id": user_info["id"],
+            "firebase_id": user_info.get("firebase_uid"),
+            "name": user_info.get("name") or user_info.get("email", ""),
+            "email": user_info.get("email"),
+            "currency": user_info.get("currency"),
+            "currency_symobl": user_info.get("currency_symobl"),
+            "plan_type": user_info.get("plan_type"),
+            "trial_end_date": user_info.get("trial_end_date"),
+        }
+
+    return user_map
+
+
+async def get_business_names_by_user_ids(user_ids: list[int]) -> dict[int, str]:
+    """
+    Fetch business names for multiple users in one query.
+    Returns a dict mapping user_id -> business_name (or None if missing).
+    """
+    if not user_ids:
+        return {}
+
+    placeholders = ",".join(["?"] * len(user_ids))
+    query = f"SELECT user_id, business_name FROM business_info WHERE user_id IN ({placeholders})"
+    rows = await Database.fetch_all(query, tuple(user_ids))
+
+    business_map = {row["user_id"]: row.get("business_name") for row in rows}
+    return business_map

@@ -17,6 +17,8 @@ from schemas.responses import (
 from logger import get_logger
 from .dbUtils import (check_existing_client,insert_client_record,apply_custom_client_settings)
 from .remindersUtils import notify_transaction_creation
+from Utils.rules import can_create_transaction_today
+
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -148,7 +150,9 @@ async def create_transaction(request: UnifiedTransactionRequest,
                              ):
     user_id = current_user["user_id"]
     # user_id = 1  # replace with current_user['user_id']
-
+    if not await can_create_transaction_today(user_id , current_user["plan_type"]):
+        TransCreationResponse(message="You have reached the maxium number of transactions for today, Please upgrade to continue",
+                              status="Failed")
     # try:
     if request.is_new_client:
         # Create new client first
@@ -217,8 +221,7 @@ async def create_transaction(request: UnifiedTransactionRequest,
     # Send notification
     background_tasks.add_task(
         notify_transaction_creation,
-        user_id=user_id,
-        user_email=current_user["email"],
+        user_data = current_user,
         client_id=client_id,
         client_name=request.client.name if request.is_new_client else client["name"],
         transaction_type=request.transaction.type,

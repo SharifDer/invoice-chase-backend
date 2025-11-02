@@ -6,6 +6,7 @@ from logger import get_logger
 from config import settings
 from .utils import fetch_business_info
 from .dbUtils import set_msgs_sent_count, fetch_user_currency
+from Utils.rules import can_send_email, can_send_sms
 import asyncio
 from datetime import datetime
 from typing import Tuple
@@ -264,8 +265,7 @@ def generate_transaction_sms(business_name: str, client_name: str, transaction_t
 
 
 async def notify_transaction_creation(
-    user_id: int,
-    user_email : str,
+    user_data : dict,
     client_id: int,
     client_name: str,
     transaction_type: str,
@@ -276,6 +276,8 @@ async def notify_transaction_creation(
     """
     Check notification settings and send transaction notification (email or SMS).
     """
+    user_id = user_data["user_id"]
+    user_email = user_data["email"]
     email_from = settings.EMAIL_FROM_INVOICE if transaction_type == 'invoice' else settings.EMAIL_FROM_RECEIPT 
     currency_data = await fetch_user_currency(user_id)
     currency = currency_data["currency_name"] if currency_data else "USD"
@@ -317,6 +319,8 @@ async def notify_transaction_creation(
     # 4️⃣ Send according to communication method
     try:
         if communication_method == "sms":
+            if not await can_send_sms(user_id , user_data["plan_type"]):
+                logger.info(f"SMS limit reached for user {user_id}, skipping SMS.")
             if not client_phone:
                 logger.warning(f"Skipping SMS — no phone number for client {client_name}")
                 return
@@ -328,6 +332,8 @@ async def notify_transaction_creation(
             logger.info(f"✅ SMS notification sent to {client_phone} for {transaction_type}")
 
         else:  # email
+            if not await can_send_email(user_id , user_data["plan_type"]):
+                logger.info(f"Email limit reached for user {user_id}, skipping email.")
             if not client_email:
                 logger.warning(f"Skipping Email — no email for client {client_name}")
                 return

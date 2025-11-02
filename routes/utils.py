@@ -106,7 +106,7 @@ async def get_client_report_data(user_id: int, client_id: int, page: int = 1, li
 
 
 
-async def get_clients_balance(user_id: int, client_ids: list):
+async def get_clients_balance(user_data: dict, client_ids: list):
     """
     Fetch clients for a given user with their current balance (invoices - payments).
     Returns a list of client dicts ready to be used in your existing loop.
@@ -114,12 +114,12 @@ async def get_clients_balance(user_id: int, client_ids: list):
     if not client_ids:
         return []
 
-    # Fetch user to get currency
-    user_data = await Database.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
-    if not user_data:
-        return []
-
-    currency = user_data.get("currency", "$")
+    # # Fetch user to get currency
+    # user_data = await Database.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    # if not user_data:
+    #     return []
+    user_id = user_data["user_id"]
+    currency = user_data["currency"]
 
     # Fetch business info
     business_info = await Database.fetch_one(
