@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from database import Database
 from schemas.responses import (DashboardStatsResponse, TransactionSummary,
-                               CurrencyResponse, TodayMomentum)
+                               CurrencyResponse, TodayMomentum, MonthlyUsageStats)
 from datetime import date, timedelta
 from .dbUtils import fetch_user_currency, get_user_monthly_usage
 from auth import get_current_user
 from schemas.requests import BusinessNameCurrency
 from datetime import datetime, timedelta, timezone
+from config import settings
 
 router = APIRouter()
 
@@ -157,6 +158,12 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         totals["total_invoices"] == 0
         and totals["total_receipts_amount"] == 0
     ):
+        plan = current_user["plan_type"]
+        trial_end = current_user["trial_end_date"]
+        sms_limits = settings.sms_limits
+
+        sms_limit = sms_limits.get(plan.lower(), 0)
+
         return DashboardStatsResponse(
             total_invoices=0,
             invoiced_amount=0.0,
@@ -175,6 +182,20 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
                 lastWeekPayments=0,
             ),
             recent_transactions=[],
+            monthly_usage=MonthlyUsageStats(
+                    reminders_sent_this_month = 0,
+                    sms_reminders_sent_this_month = 0 ,
+                    email_reminders_sent_this_month = 0,
+                    notifications_sent_this_month = 0 ,
+                    sms_notifications_sent_this_month = 0,
+                    email_notifications_sent_this_month = 0,
+                    emails_sent = 0,
+                    sms_sent = 0,
+                    sms_limit = 0,
+                    sms_left = sms_limit,
+                    plan_type = plan,
+                    trial_end_date = trial_end
+            )
         )
 
     # --- Normal flow for existing users ---
