@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from database import Database
 from schemas.responses import (DashboardStatsResponse, TransactionSummary,
-                               CurrencyResponse, TodayMomentum, MonthlyUsageStats)
+                               CurrencyResponse, TodayMomentum)
 from datetime import date, timedelta
-from .dbUtils import fetch_user_currency, get_user_monthly_usage
 from auth import get_current_user
 from schemas.requests import BusinessNameCurrency
 from datetime import datetime, timedelta, timezone
-from config import settings
 
 router = APIRouter()
 
@@ -205,16 +203,17 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 
 @router.get("/get_currency", response_model=CurrencyResponse)
 async def get_user_currency(current_user: dict = Depends(get_current_user)):
-    user_id = current_user["user_id"]
-    currency_data = await fetch_user_currency(user_id)
+    
+    currency_data = {"currency_symbol" : current_user["currency_symobl"],
+                     "currency_name" :  current_user["currency"]
+                     }
 
-    # Handle missing or None values
     if not currency_data or not currency_data["currency_name"] or not currency_data["currency_symbol"]:
         raise HTTPException(
             status_code=404,
             detail="This user hasn't set a currency yet."
         )
-
+    
     return currency_data
 
 

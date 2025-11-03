@@ -109,3 +109,11 @@ class BusinessNameCurrency(BaseModel):
 
 class UpdateUserPlan(BaseModel):
     plan_type : str
+
+
+## Referals
+
+class SetReferalKey(BaseModel):
+    """Payload to designate a user as a creator."""
+    Email: EmailStr
+    commission_percentage: float = Field(default=20.0, ge=0, le=100)

@@ -119,7 +119,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         "name": decoded.get("name", decoded.get("email", "")),
         "email": decoded.get("email", None),
         "currency" : client["currency"],
-        "currency_symobl" : client["currency_symobl"],
+        "currency_symobl" : client["currency_symobl"], ##this column is mis spelled in the db and here
         "plan_type" : client["plan_type"],
         "trial_end_date" : client["trial_end_date"],
 

@@ -259,3 +259,20 @@ class HealthCheckResponse(BaseModel):
     status: str
     database: str
     timestamp: datetime = datetime.utcnow()
+
+
+
+## Referals 
+
+class SetReferalResponse(BaseModel):
+    """Response after setting a user as a creator."""
+    referral_link: str
+
+
+class ReferralStatsResponse(BaseModel):
+    """Statistics for the creator's dashboard."""
+    referral_link: str
+    total_signups: int
+    trialing_users: int
+    paid_users: int
+    
