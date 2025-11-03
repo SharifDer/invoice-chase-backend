@@ -9,7 +9,8 @@ from config import settings
 from datetime import datetime
 from fastapi import HTTPException, status
 from fastapi import BackgroundTasks
-from .utils import welcome_email_task
+from .utils import generate_welcome_email
+from .reminders import send_email
 
 from firebase_admin import auth
 logger = get_logger(__name__)
@@ -272,3 +273,19 @@ async def login(request: FirebaseLoginRequest):
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """Return current user profile."""
     return UserResponse(**current_user)
+
+
+
+async def welcome_email_task(name , email):
+    subject, html, text = generate_welcome_email(
+        business_name="Pursue Payments",
+        client_name=name
+    )
+    await send_email(
+        to_email=email,
+        subject=subject,
+        html_content=html,
+        text_content=text,
+        from_email=settings.EMAIL_FROM_SYSTEM,
+        reply_to=settings.EMAIL_SUPPORT_INBOX
+    )

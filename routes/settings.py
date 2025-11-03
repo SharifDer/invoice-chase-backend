@@ -6,7 +6,7 @@ from logger import get_logger
 from schemas.responses import (BusinessDataRes, NotificationSettings,
                                BaseResponse)
 from schemas.requests import UpdateUserPlan
-from .utils import fetch_business_info
+from .dbUtils import fetch_business_info
 logger = get_logger(__name__)
 router = APIRouter( tags=["Settings"])
 

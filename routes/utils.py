@@ -5,7 +5,7 @@ from schemas.responses import (ClientReportResponse, ClientTransaction,
                                BusinessProfile, BusinessDataRes)
 
 from .remindersUtils import generate_welcome_email
-from .reminders import send_email
+# from .reminders import send_email
 from config import settings
 
 async def get_client_report_data(user_id: int, client_id: int, page: int = 1, limit: int = 10) -> ClientReportResponse:
@@ -183,25 +183,5 @@ async def get_user_business_info(user_id: int):
     }
 
 
-async def fetch_business_info(user_id : int)->BusinessDataRes :
-    record = await Database.fetch_one(
-        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
-    )
-    return record
 
 
-
-
-async def welcome_email_task(name , email):
-    subject, html, text = generate_welcome_email(
-        business_name="Pursue Payments",
-        client_name=name
-    )
-    await send_email(
-        to_email=email,
-        subject=subject,
-        html_content=html,
-        text_content=text,
-        from_email=settings.EMAIL_FROM_SYSTEM,
-        reply_to=settings.EMAIL_SUPPORT_INBOX
-    )

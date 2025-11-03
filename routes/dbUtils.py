@@ -2,7 +2,7 @@ from database import Database
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from logger import get_logger
-from schemas.responses import MonthlyUsageStats
+from schemas.responses import MonthlyUsageStats, BusinessDataRes
 from config import settings
 
 logger = get_logger(__name__)
@@ -323,3 +323,10 @@ async def get_business_names_by_user_ids(user_ids: list[int]) -> dict[int, str]:
 
     business_map = {row["user_id"]: row.get("business_name") for row in rows}
     return business_map
+
+
+async def fetch_business_info(user_id : int)->BusinessDataRes :
+    record = await Database.fetch_one(
+        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
+    )
+    return record

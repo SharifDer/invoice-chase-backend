@@ -4,7 +4,7 @@ import resend
 from database import Database
 from logger import get_logger
 from config import settings
-from .utils import fetch_business_info
+from .dbUtils import fetch_business_info
 from .dbUtils import set_msgs_sent_count, fetch_user_currency
 from Utils.rules import can_send_email, can_send_sms
 import asyncio
