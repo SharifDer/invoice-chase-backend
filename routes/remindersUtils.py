@@ -56,6 +56,83 @@ async def send_email(to_email: str, subject: str, html_content: str, text_conten
         return None
 
 
+def generate_welcome_email(
+    business_name: str,
+    client_name: str,
+    login_link: str = "https://pursuepayments.com"
+) -> Tuple[str, str, str]:
+    """
+    Generates a professional, spam-friendly HTML and plain-text welcome email
+    that encourages the user to start creating invoices and recording payments.
+    Returns (subject, html_content, text_content)
+    """
+    subject = f"Welcome to {business_name}, {client_name}! Let's get started"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{subject}</title>
+<style>
+body {{ margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,'Helvetica Neue',sans-serif; background:#f3f4f6; }}
+.container {{ max-width:600px; margin:24px auto; background:#ffffff; border-radius:8px; overflow:hidden; border:1px solid #e6edf3; }}
+.header {{ background:linear-gradient(90deg,#3b82f6,#1e40af); padding:20px; color:#fff; text-align:center; }}
+.header h1 {{ margin:0; font-size:20px; font-weight:700; }}
+.content {{ padding:28px; color:#0f172a; line-height:1.5; }}
+.btn {{ display:inline-block; padding:12px 20px; border-radius:6px; text-decoration:none; font-weight:600; margin-top:18px; background:#3b82f6; color:#fff; }}
+.footer {{ padding:24px; background:#f8fafc; color:#64748b; font-size:12px; text-align:center; line-height:1.5; }}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header"><h1>Welcome to {business_name}, {client_name}!</h1></div>
+<div class="content">
+<p>Hi {client_name},</p>
+<p>We're excited to have you on board! {business_name} makes it easy to manage your finances, track payments, and stay on top of your business.</p>
+<p>Here’s what you can do next:</p>
+<ul>
+<li>Create your first invoice in seconds</li>
+<li>Record payments and monitor cash flow effortlessly</li>
+<li>Explore your dashboard for insights and reports</li>
+</ul>
+<p>Getting started is quick—just click the button below to log in and take control of your business finances:</p>
+<a href="{login_link}" class="btn">Get Started</a>
+<p>If you have any questions or need assistance, our support team is always ready to help.</p>
+<p>- The {business_name} Team</p>
+</div>
+<div class="footer">
+<p>Sent via {business_name}</p>
+<p>123 Main St, Riyadh, Saudi Arabia</p>
+<p>&copy; {datetime.now().year} {business_name}</p>
+</div>
+</div>
+</body>
+</html>"""
+
+    text_content = f"""Welcome to {business_name}, {client_name}!
+
+Hi {client_name},
+
+We're excited to have you on board! {business_name} makes it easy to manage your finances, track payments, and stay on top of your business.
+
+Here’s what you can do next:
+- Create your first invoice in seconds
+- Record payments and monitor cash flow effortlessly
+- Explore your dashboard for insights and reports
+
+Get started now: {login_link}
+
+If you have any questions or need assistance, our support team is always ready to help.
+
+- The {business_name} Team
+Sent via {business_name}
+123 Main St, Riyadh, Saudi Arabia
+© {datetime.now().year} {business_name}
+"""
+
+    return subject, html_content, text_content
+
 def generate_transaction_email(
     business_name: str,
     client_name: str,

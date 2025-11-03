@@ -2,19 +2,24 @@ from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import auth as firebase_auth
 from database import Database
 from auth import AuthUtils, get_current_user, make_firebase_api_request
-from schemas.requests import GoogleAuthRequest, CreateUserRequest, FirebaseLoginRequest, ReqUserLogin
+from schemas.requests import CreateUserRequest, FirebaseLoginRequest, ReqUserLogin
 from schemas.responses import AuthResponse, UserResponse
 from logger import get_logger
 from config import settings
 from datetime import datetime
 from fastapi import HTTPException, status
+from fastapi import BackgroundTasks
+from .utils import welcome_email_task
 
 from firebase_admin import auth
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-async def _get_or_create_user(uid: str, email: str, name: str = None ,email_verified: bool = False):
+async def _get_or_create_user(uid: str, email: str, background : BackgroundTasks,
+                              name: str = None , 
+                              email_verified: bool = False,
+                             ):
     """Fetch user from DB or create if missing."""
     user = await Database.fetch_one("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
     if not user:
@@ -26,6 +31,7 @@ async def _get_or_create_user(uid: str, email: str, name: str = None ,email_veri
 
         user = await Database.fetch_one("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
         logger.info(f"New Firebase user created: {email}")
+        background.add_task(welcome_email_task , name , email)
     else:
         # Update email_verified if user already exists and value changed
         if user["email_verified"] != email_verified:
@@ -33,6 +39,7 @@ async def _get_or_create_user(uid: str, email: str, name: str = None ,email_veri
                 "UPDATE users SET email_verified = ? WHERE firebase_uid = ?",
                 (email_verified, uid)
             )
+            
     return user
 
 
