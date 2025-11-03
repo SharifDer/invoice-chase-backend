@@ -242,7 +242,7 @@ async def signup(request: FirebaseLoginRequest):
         user = await _get_or_create_user(
             decoded["uid"],
             decoded.get("email"),
-            request.name,
+            decoded.name,
             decoded.get("email_verified", False)
         )
         return AuthResponse(user=UserResponse(**user), message="User created successfully")
