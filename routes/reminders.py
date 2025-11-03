@@ -120,7 +120,7 @@ async def send_test_email(
             status="Failed",
             message="You reached your limits of number of emails sent"
         )
-    user_info = await get_user_business_info(user_id)
+    user_info = await get_user_business_info(current_user)
 
     if not user_info:
         return TestReminderRes(
@@ -181,7 +181,7 @@ async def send_test_sms(request: EmailSendReq,
             status="Failed",
             message="You reached your limits of number of sms sent"
         )
-    user_info = await get_user_business_info(user_id)
+    user_info = await get_user_business_info(current_user)
 
     if not user_info or not user_info.get("phone"):
         return TestReminderRes(
@@ -195,6 +195,7 @@ async def send_test_sms(request: EmailSendReq,
             business_name=user_info["business_name"],
             client_name=user_info["name"],
             balance=350.75,
+            currency=user_info["currency"],
             urgent=False
         )
         body += " [This is a test reminder SMS for preview purposes only.]"

@@ -154,20 +154,20 @@ async def get_clients_balance(user_data: dict, client_ids: list):
 
     return clients
 
-async def get_user_business_info(user_id: int):
+async def get_user_business_info(user_data: dict):
     """
     Fetch user information, business name, and currency for a given user_id.
     Returns a dict with: name, email, business_name, currency.
     """
-    user_data = await Database.fetch_one(
-        "SELECT * FROM users WHERE id = ?", (user_id,)
-    )
+    # user_data = await Database.fetch_one(
+    #     "SELECT * FROM users WHERE id = ?", (user_id,)
+    # )
     if not user_data:
         return None  # Or raise an exception if preferred
-
+    user_id = user_data["user_id"]
     user_name = user_data["name"]
     user_email = user_data["email"]
-    currency = user_data.get("currency", "$")
+    currency = user_data["currency"]
 
     business_info = await Database.fetch_one(
         "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
