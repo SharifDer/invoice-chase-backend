@@ -315,6 +315,7 @@ def generate_reminder_sms(business_name: str, client_name: str, balance: float, 
         sms_text = (
             f"Hello {client_name}, {business_name} would like to inform you that your account currently reflects a balance of "
             f"{currency}{balance:,.2f}."
+            f"This is an automated reminder from our system."
         )
     
     return sms_text

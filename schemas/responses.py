@@ -15,7 +15,14 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     name: str
+    firebase_uid: str
+    email_verified: bool
+    currency: str
+    currency_symbol: str | None = None
+    plan_type: str | None = None
+    trial_end_date: datetime | None = None
     created_at: datetime
+    updated_at: datetime
 
 
 class AuthResponse(BaseResponse):
