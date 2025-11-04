@@ -34,6 +34,7 @@ async def _get_or_create_user(uid: str, email: str,
         user = await Database.fetch_one("SELECT * FROM users WHERE firebase_uid = ?", (uid,))
         logger.info(f"New Firebase user created: {email}")
         background.add_task(welcome_email_task , name , email)
+        logger.info(f"Welcome email is being sent to this email : {email}")
     if user and user["email_verified"] != email_verified:
         await Database.execute(
             "UPDATE users SET email_verified = ? WHERE firebase_uid = ?",
@@ -277,12 +278,11 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
 
 
-async def welcome_email_task(name , email , background : BackgroundTasks):
+async def welcome_email_task(name , email):
     subject, html, text = generate_welcome_email(
         business_name="Pursue Payments",
         client_name=name
     )
-    background.add_task()
     await send_email(
         to_email=email,
         subject=subject,
