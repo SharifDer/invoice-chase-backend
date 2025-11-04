@@ -157,10 +157,6 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         totals["total_invoices"] == 0
         and totals["total_receipts_amount"] == 0
     ):
-        # sms_limits = settings.sms_limits
-
-        # sms_limit = sms_limits.get(plan.lower(), 0)
-
         return DashboardStatsResponse(
             total_invoices=0,
             invoiced_amount=0.0,
