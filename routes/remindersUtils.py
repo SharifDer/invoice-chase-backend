@@ -365,9 +365,7 @@ async def notify_transaction_creation(
     if business_info and business_info.get("business_name"):
         business_name = business_info["business_name"]
     else:
-        row = await Database.fetch_one("SELECT name FROM users WHERE id=?", (user_id,))
-        if row and row.get("name"):
-            business_name = row["name"]
+        business_name = user_data["name"]
     # 1️⃣ Fetch client-specific settings (if any)
     client_settings = await Database.fetch_one(
         "SELECT * FROM client_settings WHERE user_id=? AND client_id=?",
