@@ -1,7 +1,7 @@
 name: InvoiceChase Dev CI/CD
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Only manual trigger for dev
     inputs:
       branch:
         description: 'Branch to deploy'
@@ -11,53 +11,50 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Deploy code to VPS
+      - name: Deploy DEV code to VPS
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          # This is the new port you just set up
           port: 2222
-          
           script: |
             set -e
-            DEPLOY_DIR=/opt/invoicechase
+            DEPLOY_DIR=/opt/invoicechase_dev # <-- 1. Set DEV directory
+            BRANCH_TO_DEPLOY="${{ github.event.inputs.branch }}"
 
-            # 1. Ensure deploy dir exists
+            echo "--- Deploying DEV branch: $BRANCH_TO_DEPLOY ---"
+
             mkdir -p $DEPLOY_DIR
-
-            # 2. Pull latest code
             if [ ! -d "$DEPLOY_DIR/.git" ]; then
-              git clone -b ${{ github.event.inputs.branch }} https://github.com/${{ github.repository }}.git $DEPLOY_DIR
+              git clone -b $BRANCH_TO_DEPLOY https://github.com/${{ github.repository }}.git $DEPLOY_DIR
             else
               cd $DEPLOY_DIR
               git fetch origin
-              git reset --hard origin/${{ github.event.inputs.branch }}
+              git reset --hard origin/$BRANCH_TO_DEPLOY
             fi
 
-            # 3. Create virtualenv
             if [ ! -d "$DEPLOY_DIR/venv" ]; then
               python3.12 -m venv $DEPLOY_DIR/venv
             fi
 
-            # 4. Install requirements
             source $DEPLOY_DIR/venv/bin/activate
             pip install --upgrade pip
             pip install -r $DEPLOY_DIR/requirements.txt
 
-            # 5. Create secret files
             mkdir -p $DEPLOY_DIR/keys
             
+            # Use DEV secrets
             cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
-            ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+            ${{ secrets.DEV_FIREBASE_SERVICE_ACCOUNT_JSON }}
             EOF
-            
             cat <<'EOF' > $DEPLOY_DIR/keys/keys.json
-            ${{ secrets.API_KEYS_JSON }}
+            ${{ secrets.DEV_API_KEYS_JSON }}
             EOF
 
-            # 6. Restart the app service
-            sudo systemctl restart invoicechase
+            # Set correct permissions
+            sudo chown -R invoicechase_user:invoicechase_user $DEPLOY_DIR
+
+            # Restart the DEV service
+            sudo systemctl restart invoicechase_dev # <-- 2. Restart DEV service
