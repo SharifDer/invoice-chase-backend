@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field,model_validator
 from typing import Optional,Literal, List
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from fastapi import Query
 # ======================
@@ -16,8 +16,8 @@ class CreateUserRequest(BaseModel):
 # Frontend Firebase login/signup
 class FirebaseLoginRequest(BaseModel):
     firebase_token: str
-    email: Optional[EmailStr] = None  # optional, for storing in DB
-    name: str = Field(..., min_length=1)
+    # email: Optional[EmailStr] = None  # optional, for storing in DB
+    # name: str = Field(..., min_length=1)
 
 class GoogleAuthRequest(BaseModel):
     firebase_token: str
@@ -63,6 +63,7 @@ class TransactionCreateRequest(BaseModel):
     type: Literal['payment', 'invoice']
     amount: Decimal = Field(..., gt=0)
     description: Optional[str] = None
+    created_date : date
 
    
 class UnifiedTransactionRequest(BaseModel):
@@ -93,7 +94,7 @@ class TransactionUpdateRequest(BaseModel):
 # ======================
 
 class EmailSendReq(BaseModel):
-    type : str        #balance reminder or transaction notifcation creation
+    type: Literal["reminder", "notification"]        #balance reminder or transaction notifcation creation so the filed either reminder or notification
 
 class UrgentReminderReq(BaseModel):
     client_ids: List[int]  
@@ -104,3 +105,15 @@ class BusinessNameCurrency(BaseModel):
     business_name : str
     currency : str
     currency_symbol : str
+    plan_type : str
+
+class UpdateUserPlan(BaseModel):
+    plan_type : str
+
+
+## Referals
+
+class SetReferalKey(BaseModel):
+    """Payload to designate a user as a creator."""
+    Email: EmailStr
+    commission_percentage: float = Field(default=20.0, ge=0, le=100)

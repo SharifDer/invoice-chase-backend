@@ -39,6 +39,18 @@ class Database:
             logger.debug(f"Executed: {query[:100]}...")
     
     @classmethod
+    async def execute_batch(cls, queries: List[tuple]) -> None:
+        """
+        Execute multiple different queries in a single connection/transaction.
+        Each item in `queries` should be (query_str, params_tuple).
+        """
+        async with cls.connection() as conn:
+            for query, params in queries:
+                await conn.execute(query, params or ())
+            await conn.commit()
+            logger.debug(f"Executed batch of {len(queries)} queries")
+    
+    @classmethod
     async def fetch_one(cls, query: str, params: tuple = None) -> Optional[Dict[str, Any]]:
         """Fetch a single row"""
         async with cls.connection() as conn:
@@ -89,12 +101,25 @@ class Database:
             email_verified BOOLEAN DEFAULT FALSE,
             currency TEXT NOT NULL DEFAULT 'USD',
             currency_symobl Text , 
-            sms_sent_count INTEGER DEFAULT 0,
-            email_sent_count INTEGER DEFAULT 0,
+            plan_type text,
+            trial_end_date DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
             """,
+                     """
+            CREATE TABLE IF NOT EXISTS user_monthly_usage (
+                user_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                sms_reminders_sent_count INTEGER DEFAULT 0,
+                sms_notifications_sent_count INTEGER DEFAULT 0,
+                email_reminders_sent_count INTEGER DEFAULT 0,
+                email_notifications_sent_count INTEGER DEFAULT 0,
+                PRIMARY KEY(user_id, year, month),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+                """
             """
             CREATE TABLE IF NOT EXISTS business_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -15,7 +15,14 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     name: str
+    firebase_uid: str
+    email_verified: bool
+    currency: str
+    currency_symbol: str | None = None
+    plan_type: str | None = None
+    trial_end_date: datetime | None = None
     created_at: datetime
+    updated_at: datetime
 
 
 class AuthResponse(BaseResponse):
@@ -85,15 +92,13 @@ class ClientReportResponse(BaseModel):
     total_pages: int
     business_profile: Optional[BusinessProfile] = None 
 class ClientSettingsResponse(BaseModel):
-    communicationMethod : str
-    transactionNotificationEnabled : bool
-    reminderEnabled : bool
-    reminderIntervalDays : int
-    reminderMinimumAmount : float
+    communicationMethod : Optional[str]
+    transactionNotificationEnabled : Optional[bool]
+    reminderEnabled : Optional[bool]
+    reminderIntervalDays : Optional[int]
+    reminderMinimumAmount : Optional[float]
 # Invoice Responses
-class TransactionResponse(BaseModel):
-  message : str
-  status : str
+
 
 
 class TransCreationResponse(BaseModel):
@@ -106,7 +111,7 @@ class TransactionDetailsResponse(BaseModel):
     Description: Optional[str] = None
 
 class TransactionResponse(BaseModel):
-    transaction_number: str        ##transaction number not db id 
+    transaction_number: str        ##transaction id not db table id the one that's like TNX
     client_id: int
     client_name: str
     type: str               # "invoice" | "payment"
@@ -146,6 +151,20 @@ class TodayMomentum(BaseModel):
     thisWeekPayments: int
     lastWeekInvoices: int
     lastWeekPayments: int
+class MonthlyUsageStats(BaseModel):
+    """
+    Pydantic model for representing user usage statistics and plan details.
+    """
+    reminders_sent_this_month: int ## This field is the sum of sms_reminders_sent_this_month : int + email_reminders_sent_this_month : int
+    sms_reminders_sent_this_month : int
+    email_reminders_sent_this_month : int
+    notifications_sent_this_month: int ## This field is the sum of sms_notifications_sent_this_month : int + email_notifications_sent_this_month : int
+    sms_notifications_sent_this_month : int
+    email_notifications_sent_this_month : int
+    emails_sent: int
+    sms_sent: int
+    sms_limit: int
+    sms_left: int
 
 class DashboardStatsResponse(BaseModel):
     total_invoices: int
@@ -154,7 +173,13 @@ class DashboardStatsResponse(BaseModel):
     total_receipts_amount: float
     todayMomentum: TodayMomentum
     recent_transactions: List[TransactionSummary]
+    plan_type: str
+    trial_end_date: Optional[datetime] = None
+    # monthly_usage: Optional[MonthlyUsageStats] = None
 
+
+  
+     
 class CurrencyResponse(BaseModel):
     currency_symbol : str 
     currency_name : str
@@ -189,6 +214,7 @@ class TopClientByBalanceData(BaseModel):
 
 
 class AgingBalanceClientData(BaseModel):
+    client_id : int
     name: str
     company: str
     balance: float
@@ -213,6 +239,7 @@ class AnalyticsResponse(BaseModel):
     topClientsByBalance: List[TopClientByBalanceData]
     agingBalances: AgingBalancesData
     netCashChange: NetCashChangeData
+    monthly_usage: Optional[MonthlyUsageStats] = None
 # Settings Responses
 # --- MODELS --- #
 class BusinessDataRes(BaseModel):
@@ -239,3 +266,20 @@ class HealthCheckResponse(BaseModel):
     status: str
     database: str
     timestamp: datetime = datetime.utcnow()
+
+
+
+## Referals 
+
+class SetReferalResponse(BaseModel):
+    """Response after setting a user as a creator."""
+    referral_link: str
+
+
+class ReferralStatsResponse(BaseModel):
+    """Statistics for the creator's dashboard."""
+    referral_link: str
+    total_signups: int
+    trialing_users: int
+    paid_users: int
+    

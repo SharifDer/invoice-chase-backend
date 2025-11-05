@@ -3,6 +3,9 @@
 
 # Local virtual environment
 .venv/
+env
+
+venv/
 keys/
 # VS Code workspace settings
 .vscode/

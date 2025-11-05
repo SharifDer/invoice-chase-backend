@@ -1,12 +1,18 @@
-name: InvoiceChase Dev CI/CD
+name: InvoiceChase CI/CD
 
 on:
+  # Manual trigger
   workflow_dispatch:
     inputs:
       branch:
         description: 'Branch to deploy'
-        default: 'dev'
+        default: 'main'
         required: true
+  
+  # Automatic trigger on push to the 'main' branch
+  push:
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
@@ -19,36 +25,48 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          # This is the new port you just set up
           port: 2222
           
           script: |
             set -e
             DEPLOY_DIR=/opt/invoicechase
+            
+            # --- THIS IS THE NEW PART ---
+            # Set the branch to deploy based on the event
+            # If it's a manual run, use the input. If it's a push, use the ref_name (e.g., 'main').
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+              BRANCH_TO_DEPLOY="${{ github.event.inputs.branch }}"
+            else
+              BRANCH_TO_DEPLOY="${{ github.ref_name }}"
+            fi
+            
+            echo "--- Deploying branch: $BRANCH_TO_DEPLOY ---"
+            # --- END OF NEW PART ---
 
             # 1. Ensure deploy dir exists
             mkdir -p $DEPLOY_DIR
 
-            # 2. Pull latest code
+            # 2. Pull latest code (clone if first deploy)
+            # We now use the new $BRANCH_TO_DEPLOY variable
             if [ ! -d "$DEPLOY_DIR/.git" ]; then
-              git clone -b ${{ github.event.inputs.branch }} https://github.com/${{ github.repository }}.git $DEPLOY_DIR
+              git clone -b $BRANCH_TO_DEPLOY https://github.com/${{ github.repository }}.git $DEPLOY_DIR
             else
               cd $DEPLOY_DIR
               git fetch origin
-              git reset --hard origin/${{ github.event.inputs.branch }}
+              git reset --hard origin/$BRANCH_TO_DEPLOY
             fi
 
-            # 3. Create virtualenv
+            # 3. Ensure virtualenv exists
             if [ ! -d "$DEPLOY_DIR/venv" ]; then
               python3.12 -m venv $DEPLOY_DIR/venv
             fi
 
-            # 4. Install requirements
+            # 4. Activate venv and install requirements
             source $DEPLOY_DIR/venv/bin/activate
             pip install --upgrade pip
             pip install -r $DEPLOY_DIR/requirements.txt
 
-            # 5. Create secret files
+            # 5. Create the secret key files ON THE SERVER
             mkdir -p $DEPLOY_DIR/keys
             
             cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
@@ -59,5 +77,5 @@ jobs:
             ${{ secrets.API_KEYS_JSON }}
             EOF
 
-            # 6. Restart the app service
+            # 6. Restart the FastAPI app using systemd
             sudo systemctl restart invoicechase

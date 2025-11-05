@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import List, Literal, Optional
-
+from .dbUtils import get_user_monthly_usage
 from database import Database
 from auth import get_current_user
 from schemas.responses import (
@@ -14,7 +14,8 @@ from schemas.responses import (
     TopClientByBalanceData,
     AgingBalancesData,
     AgingBalanceClientData,
-    NetCashChangeData
+    NetCashChangeData,
+    MonthlyUsageStats
 )
 from logger import get_logger
 
@@ -25,7 +26,7 @@ router = APIRouter()
 @router.get("/get_analytics", response_model=AnalyticsResponse)
 async def get_analytics(
     period: Literal["7days", "30days"] = Query(default="7days"),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get analytics data for the dashboard
@@ -43,8 +44,8 @@ async def get_analytics(
     - Net cash change for period
     """
 
-    # user_id = current_user['user_id']
-    user_id = 1
+    user_id = current_user['user_id']
+    # user_id = 1
     days = 7 if period == "7days" else 30
     
     logger.info(f"Fetching analytics for user {user_id}, period: {period}")
@@ -61,7 +62,8 @@ async def get_analytics(
     top_clients_by_balance = await _get_top_clients_by_balance(user_id)
     aging_balances = await _get_aging_balances(user_id)
     net_cash_change = await _get_net_cash_change(user_id, days)
-    
+
+    monthly_usage = await get_user_monthly_usage(user_id , current_user)
     logger.info(f"Analytics data retrieved successfully for user {user_id}")
     
     return AnalyticsResponse(
@@ -71,7 +73,8 @@ async def get_analytics(
         weeklyCashFlow=weekly_cash_flow,
         topClientsByBalance=top_clients_by_balance,
         agingBalances=aging_balances,
-        netCashChange=net_cash_change
+        netCashChange=net_cash_change,
+        monthly_usage=monthly_usage
     )
 
 
@@ -288,9 +291,12 @@ async def _get_top_clients_by_balance(user_id: int, limit: int = 5) -> List[TopC
 
 
 
-async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBalancesData:
+async def _get_aging_balances(user_id: int, days_threshold: int = 15) -> AgingBalancesData:
     """
-    Get clients with aging balances (no payment in 30+ days and have outstanding balance)
+    Get clients with aging balances:
+    - Owe money (balance > 0)
+    - No payment in >= days_threshold
+    - Ignores fresh invoices less than days_threshold old
     """
     try:
         query = """
@@ -304,50 +310,67 @@ async def _get_aging_balances(user_id: int, days_threshold: int = 30) -> AgingBa
                               WHERE client_id = c.id AND type = 'invoice'), 0) -
                     COALESCE((SELECT SUM(amount) FROM transactions 
                               WHERE client_id = c.id AND type = 'payment'), 0)
-                ) as balance,
+                ) AS balance,
                 (
-                    SELECT MAX(created_date) FROM transactions 
+                    SELECT MAX(created_date)
+                    FROM transactions 
                     WHERE client_id = c.id AND type = 'payment'
-                ) as last_payment_date
+                ) AS last_payment_date,
+                (
+                    SELECT MIN(created_date)
+                    FROM transactions 
+                    WHERE client_id = c.id AND type = 'invoice'
+                ) AS first_invoice_date
             FROM clients c
             WHERE c.user_id = ?
         )
-        SELECT 
+        SELECT
+            id, 
             name,
             company,
             balance,
             CASE 
-                WHEN last_payment_date IS NULL THEN 999
-                ELSE CAST(julianday('now') - julianday(last_payment_date) AS INTEGER)
-            END as days_since_payment
+                WHEN last_payment_date IS NULL THEN 
+                    CAST(julianday('now') - julianday(first_invoice_date) AS INTEGER)
+                ELSE 
+                    CAST(julianday('now') - julianday(last_payment_date) AS INTEGER)
+            END AS days_since_payment
         FROM client_balances
         WHERE balance > 0
         AND (
-            last_payment_date IS NULL 
-            OR julianday('now') - julianday(last_payment_date) >= ?
+            (last_payment_date IS NULL AND first_invoice_date IS NOT NULL 
+             AND julianday('now') - julianday(first_invoice_date) >= ?)
+            OR (last_payment_date IS NOT NULL 
+                AND julianday('now') - julianday(last_payment_date) >= ?)
         )
         ORDER BY balance DESC
         """
-        results = await Database.fetch_all(query, (user_id, days_threshold))
         
-        clients = []
-        
-        for result in results:
-            clients.append(AgingBalanceClientData(
-                name=result['name'],
-                company=result['company'] or "",
-                balance=float(result['balance']),
-                daysSincePayment=result['days_since_payment']
-            ))
-        
+        results = await Database.fetch_all(query, (user_id, days_threshold, days_threshold))
+
+        # Handle empty results gracefully
+        if not results:
+            return AgingBalancesData(count=0, clients=[])
+
+        clients = [
+            AgingBalanceClientData(
+                client_id=r["id"],
+                name=r["name"],
+                company=r["company"] or "",
+                balance=float(r["balance"]),
+                daysSincePayment=r["days_since_payment"] or 0
+            )
+            for r in results
+        ]
+
         return AgingBalancesData(
             count=len(clients),
             clients=clients
         )
-    
+
     except Exception as e:
         logger.error(f"Error fetching aging balances: {e}")
-        return AgingBalancesData(count=0, totalAmount=0.0, clients=[])
+        return AgingBalancesData(count=0, clients=[])
 
 
 async def _get_net_cash_change(user_id: int, days: int) -> NetCashChangeData:

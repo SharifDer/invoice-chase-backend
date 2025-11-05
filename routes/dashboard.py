@@ -1,36 +1,38 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from database import Database
 from schemas.responses import (DashboardStatsResponse, TransactionSummary,
-                               CurrencyResponse)
+                               CurrencyResponse, TodayMomentum)
 from datetime import date, timedelta
-from .dbUtils import fetch_user_currency
 from auth import get_current_user
 from schemas.requests import BusinessNameCurrency
+from datetime import datetime, timedelta, timezone
+
 router = APIRouter()
 
 
 # ----------------------------
 # Helper Functions
 # ----------------------------
-
 async def get_total_stats(user_id: int):
-    invoice_row = await Database.fetch_one(
-        "SELECT COUNT(*) AS total_invoices, COALESCE(SUM(amount),0) AS invoiced_amount "
-        "FROM transactions WHERE user_id = ? AND type = 'invoice';",
-        (user_id,)
-    )
-
-    payment_row = await Database.fetch_one(
-        "SELECT COUNT(*) AS num_of_receipts, COALESCE(SUM(amount),0) AS total_receipts_amount "
-        "FROM transactions WHERE user_id = ? AND type = 'payment';",
-        (user_id,)
+    """Single-query optimized totals aggregation."""
+    row = await Database.fetch_one(
+        """
+        SELECT 
+            COUNT(CASE WHEN type = 'invoice' THEN 1 END) AS total_invoices,
+            COALESCE(SUM(CASE WHEN type = 'invoice' THEN amount END), 0) AS invoiced_amount,
+            COUNT(CASE WHEN type = 'payment' THEN 1 END) AS num_of_receipts,
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount END), 0) AS total_receipts_amount
+        FROM transactions
+        WHERE user_id = ?;
+        """,
+        (user_id,),
     )
 
     return {
-        "total_invoices": invoice_row["total_invoices"],
-        "invoiced_amount": invoice_row["invoiced_amount"],
-        "num_of_receipts": payment_row["num_of_receipts"],
-        "total_receipts_amount": payment_row["total_receipts_amount"]
+        "total_invoices": row["total_invoices"],
+        "invoiced_amount": row["invoiced_amount"],
+        "num_of_receipts": row["num_of_receipts"],
+        "total_receipts_amount": row["total_receipts_amount"],
     }
 
 
@@ -139,18 +141,49 @@ async def get_recent_transactions(user_id: int, limit: int = 5)-> TransactionSum
 # ----------------------------
 
 @router.get("/stats", response_model=DashboardStatsResponse)
-async def get_dashboard_stats():
+async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     """
     Get dashboard statistics and overview data:
     - Totals
     - Today's momentum
     - Last 5 transactions
     """
-    user_id = 1  # Replace with get_current_user(user).id in production
-
+    user_id = current_user["user_id"]
     totals = await get_total_stats(user_id)
+    plan = current_user["plan_type"]
+    trial_end = current_user["trial_end_date"]
+    # --- Optimization (1): short-circuit for users with no transactions ---
+    if (
+        totals["total_invoices"] == 0
+        and totals["total_receipts_amount"] == 0
+    ):
+        return DashboardStatsResponse(
+            total_invoices=0,
+            invoiced_amount=0.0,
+            num_of_receipts=0,
+            total_receipts_amount=0.0,
+            todayMomentum=TodayMomentum(
+                todayInvoices=0,
+                todayPayments=0,
+                todayInvoicesAmount=0.0,
+                todayPaymentsAmount=0.0,
+                dailyAvgInvoices=0.0,
+                dailyAvgPayments=0.0,
+                thisWeekInvoices=0,
+                thisWeekPayments=0,
+                lastWeekInvoices=0,
+                lastWeekPayments=0,
+            ),
+            recent_transactions=[],    
+            plan_type = plan,
+            trial_end_date = trial_end
+            
+        )
+
+    # --- Normal flow for existing users ---
     today_momentum = await get_today_momentum(user_id)
     recent_transactions = await get_recent_transactions(user_id)
+    # user_monthly_usage = await get_user_monthly_usage(user_id , current_user)
 
     return DashboardStatsResponse(
         total_invoices=totals["total_invoices"],
@@ -158,16 +191,25 @@ async def get_dashboard_stats():
         num_of_receipts=totals["num_of_receipts"],
         total_receipts_amount=totals["total_receipts_amount"],
         todayMomentum=today_momentum,
-        recent_transactions=recent_transactions
+        recent_transactions=recent_transactions,
+        plan_type = plan,
+        trial_end_date = trial_end
     )
 
-@router.get("/get_currency" , response_model=CurrencyResponse)
-async def get_user_currency(
-    # current_user : dict = Depends(get_current_user)
-                        ):
-    # user_id = current_user['user_id']
-    user_id = 1
-    currency_data = await fetch_user_currency(user_id)
+
+@router.get("/get_currency", response_model=CurrencyResponse)
+async def get_user_currency(current_user: dict = Depends(get_current_user)):
+    
+    currency_data = {"currency_symbol" : current_user["currency_symobl"],
+                     "currency_name" :  current_user["currency"]
+                     }
+
+    if not currency_data or not currency_data["currency_name"] or not currency_data["currency_symbol"]:
+        raise HTTPException(
+            status_code=404,
+            detail="This user hasn't set a currency yet."
+        )
+    
     return currency_data
 
 
@@ -175,12 +217,12 @@ async def get_user_currency(
 @router.post("/set_busname_currency")
 async def set_business_name_currency(
     request: BusinessNameCurrency,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    # user_id = current_user["user_id"]
-    user_id = 1
+    user_id = current_user["user_id"]
 
     # 1️⃣ Insert or update business name in business_info table
+    trial_end_date = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
     insert_business_sql = """
         INSERT INTO business_info (
             user_id,
@@ -200,11 +242,17 @@ async def set_business_name_currency(
         SET 
             currency = ?,
             currency_symobl = ?,
+            plan_type = ?,
+            trial_end_date = COALESCE(trial_end_date, ?),
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?;
     """
 
-    await Database.execute(insert_business_sql, (user_id, request.business_name))
-    await Database.execute(update_user_currency_sql, (request.currency, request.currency_symbol, user_id))
+    await Database.execute_batch([
+        (insert_business_sql, (user_id, request.business_name)),
+        (update_user_currency_sql, (request.currency, request.currency_symbol,
+                                    request.plan_type ,trial_end_date,
+                                    user_id))
+    ])
 
     return {"message": "Business name and currency updated successfully"}

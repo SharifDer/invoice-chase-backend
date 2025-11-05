@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import (APIRouter, Depends, 
+                     HTTPException, status, Query,
+                     BackgroundTasks)
 from datetime import datetime, date
 from decimal import Decimal
 import math
@@ -15,16 +17,18 @@ from schemas.responses import (
 from logger import get_logger
 from .dbUtils import (check_existing_client,insert_client_record,apply_custom_client_settings)
 from .remindersUtils import notify_transaction_creation
+from Utils.rules import can_create_transaction_today
+
 logger = get_logger(__name__)
 router = APIRouter()
 
 @router.get("/get_transaction/{trans_id}", response_model=TransactionDetailsResponse)
 async def get_transaction(
         trans_id: str,  # transaction_number
-        # current_user: dict = Depends(get_current_user)
+        current_user: dict = Depends(get_current_user)
     ):
-    # user_id = current_user["id"]
-    user_id = 1
+    user_id = current_user["user_id"]
+    # user_id = 1
     trans_id = trans_id.strip('"').strip("'")
     transaction = await Database.fetch_one(
         """
@@ -55,11 +59,11 @@ async def get_transactions(
     date_to: date | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get transactions for current user with filtering and pagination"""
-    # user_id = current_user["id"]
-    user_id = 1
+    user_id = current_user["user_id"]
+    # user_id = 1
 
     # --- 1. Build WHERE clause dynamically ---
     where_conditions = ["t.user_id = ?"]
@@ -139,12 +143,16 @@ async def get_transactions(
     )
 
 @router.post("/create_transaction", response_model=TransCreationResponse)
-async def create_transaction(request: UnifiedTransactionRequest
-                            #  ,current_user: dict = Depends(get_current_user)
+async def create_transaction(request: UnifiedTransactionRequest,
+                            background_tasks: BackgroundTasks
+                             ,current_user: dict = Depends(get_current_user),
+                        
                              ):
-    # user_id = current_user["user_id"]
-    user_id = 1  # replace with current_user['user_id']
-
+    user_id = current_user["user_id"]
+    # user_id = 1  # replace with current_user['user_id']
+    if not await can_create_transaction_today(user_id , current_user["plan_type"]):
+        TransCreationResponse(message="You have reached the maxium number of transactions for today, Please upgrade to continue",
+                              status="Failed")
     # try:
     if request.is_new_client:
         # Create new client first
@@ -193,7 +201,7 @@ async def create_transaction(request: UnifiedTransactionRequest
         float(request.transaction.amount),
         request.transaction.type,
         description,
-        date.today()
+        request.transaction.created_date
     ))
 
     # Get new transaction ID
@@ -211,8 +219,9 @@ async def create_transaction(request: UnifiedTransactionRequest
     )
 
     # Send notification
-    await notify_transaction_creation(
-        user_id=user_id,
+    background_tasks.add_task(
+        notify_transaction_creation,
+        user_data = current_user,
         client_id=client_id,
         client_name=request.client.name if request.is_new_client else client["name"],
         transaction_type=request.transaction.type,
@@ -220,7 +229,6 @@ async def create_transaction(request: UnifiedTransactionRequest
         client_email=request.client.email if request.is_new_client else client["email"],
         client_phone=request.client.phone if request.is_new_client else client["phone"],
     )
-
     return TransCreationResponse(
         message="Transaction created successfully",
         status="Success"
@@ -237,13 +245,12 @@ async def create_transaction(request: UnifiedTransactionRequest
 async def update_invoice(
     trans_id: str,
     request: TransactionUpdateRequest,
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """Update an existing invoice"""
     # try:
-    # user_id = current_user['user_id']
+    user_id = current_user['user_id']
     trans_id = trans_id.strip('"').strip("'")
-    user_id = 1
     # Check if invoice exists and belongs to user
     existing_transaction = await Database.fetch_one(
         "SELECT * FROM transactions WHERE transaction_number = ? AND user_id = ?",
@@ -322,13 +329,12 @@ async def update_invoice(
 
 @router.delete("/delete_transaction/{trans_id}", response_model=BaseResponse)
 async def delete_invoice(trans_id: str, 
-                        #  current_user: dict = Depends(get_current_user)
+                         current_user: dict = Depends(get_current_user)
                          ):
     """Delete transaction"""
     try:
-        # user_id = current_user['user_id']
+        user_id = current_user['user_id']
         trans_id = trans_id.strip('"').strip("'")
-        user_id = 1
         # Delete invoice
         await Database.execute(
             "DELETE FROM transactions WHERE transaction_number = ? AND user_id = ?",

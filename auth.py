@@ -117,7 +117,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         "user_id" : client["id"],
         "firebase_id": decoded["uid"],
         "name": decoded.get("name", decoded.get("email", "")),
-        "email": decoded.get("email", None)
+        "email": decoded.get("email", None),
+        "currency" : client["currency"],
+        "currency_symobl" : client["currency_symobl"], ##this column is mis spelled in the db and here
+        "plan_type" : client["plan_type"],
+        "trial_end_date" : client["trial_end_date"],
+
     }
 
 async def get_optional_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[Dict[str, Any]]:

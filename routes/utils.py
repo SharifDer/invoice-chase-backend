@@ -4,6 +4,9 @@ from database import Database
 from schemas.responses import (ClientReportResponse, ClientTransaction, 
                                BusinessProfile, BusinessDataRes)
 
+from .remindersUtils import generate_welcome_email
+# from .reminders import send_email
+from config import settings
 
 async def get_client_report_data(user_id: int, client_id: int, page: int = 1, limit: int = 10) -> ClientReportResponse:
 
@@ -106,7 +109,7 @@ async def get_client_report_data(user_id: int, client_id: int, page: int = 1, li
 
 
 
-async def get_clients_balance(user_id: int, client_ids: list):
+async def get_clients_balance(user_data: dict, client_ids: list):
     """
     Fetch clients for a given user with their current balance (invoices - payments).
     Returns a list of client dicts ready to be used in your existing loop.
@@ -114,12 +117,12 @@ async def get_clients_balance(user_id: int, client_ids: list):
     if not client_ids:
         return []
 
-    # Fetch user to get currency
-    user_data = await Database.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
-    if not user_data:
-        return []
-
-    currency = user_data.get("currency", "$")
+    # # Fetch user to get currency
+    # user_data = await Database.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    # if not user_data:
+    #     return []
+    user_id = user_data["user_id"]
+    currency = user_data["currency"]
 
     # Fetch business info
     business_info = await Database.fetch_one(
@@ -151,36 +154,34 @@ async def get_clients_balance(user_id: int, client_ids: list):
 
     return clients
 
-async def get_user_business_info(user_id: int):
+async def get_user_business_info(user_data: dict):
     """
     Fetch user information, business name, and currency for a given user_id.
     Returns a dict with: name, email, business_name, currency.
     """
-    user_data = await Database.fetch_one(
-        "SELECT * FROM users WHERE id = ?", (user_id,)
-    )
+    # user_data = await Database.fetch_one(
+    #     "SELECT * FROM users WHERE id = ?", (user_id,)
+    # )
     if not user_data:
         return None  # Or raise an exception if preferred
-
+    user_id = user_data["user_id"]
     user_name = user_data["name"]
     user_email = user_data["email"]
-    currency = user_data.get("currency", "$")
+    currency = user_data["currency"]
 
     business_info = await Database.fetch_one(
-        "SELECT business_name FROM business_info WHERE user_id = ?", (user_id,)
+        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
     )
     business_name = business_info["business_name"] if business_info else user_name
-
+    phone = business_info["phone"] if business_info else None
     return {
         "name": user_name,
         "email": user_email,
+        "phone" : phone,
         "business_name": business_name,
         "currency": currency
     }
 
 
-async def fetch_business_info(user_id : int)->BusinessDataRes :
-    record = await Database.fetch_one(
-        "SELECT * FROM business_info WHERE user_id = ?", (user_id,)
-    )
-    return record
+
+

@@ -3,8 +3,10 @@ from typing import Optional
 from database import Database
 from auth import get_current_user
 from logger import get_logger
-from schemas.responses import (BusinessDataRes, NotificationSettings)
-from .utils import fetch_business_info
+from schemas.responses import (BusinessDataRes, NotificationSettings,
+                               BaseResponse)
+from schemas.requests import UpdateUserPlan
+from .dbUtils import fetch_business_info
 logger = get_logger(__name__)
 router = APIRouter( tags=["Settings"])
 
@@ -13,10 +15,9 @@ router = APIRouter( tags=["Settings"])
 # --- BUSINESS INFO CRUD --- #
 @router.get("/business", response_model=BusinessDataRes)
 async def get_business_info(
-    # current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
     ):
-    # user_id = current_user["user_id"]
-    user_id = 1
+    user_id = current_user["user_id"]
     record = await fetch_business_info(user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Business info not found")
@@ -24,8 +25,11 @@ async def get_business_info(
 
 # Create new business info
 @router.post("/business/create", response_model=BusinessDataRes)
-async def create_business_info_record(data: BusinessDataRes):
-    user_id = 1  # replace with current_user["user_id"]
+async def create_business_info_record(data: BusinessDataRes,
+                                      current_user : dict = Depends(get_current_user)
+                                      ):
+    # user_id = 1  # replace with current_user["user_id"]
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one("SELECT id FROM business_info WHERE user_id = ?", (user_id,))
     if existing:
         raise HTTPException(status_code=400, detail="Business info already exists")
@@ -41,8 +45,11 @@ async def create_business_info_record(data: BusinessDataRes):
 
 # Update existing business info
 @router.put("/business/update", response_model=BusinessDataRes)
-async def update_business_info_record(data: BusinessDataRes):
-    user_id = 1  # replace with current_user["user_id"]
+async def update_business_info_record(data: BusinessDataRes,
+                                      current_user : dict = Depends(get_current_user)
+                                      ):
+    # user_id = 1  # replace with current_user["user_id"]
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one("SELECT id FROM business_info WHERE user_id = ?", (user_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Business info not found")
@@ -59,17 +66,19 @@ async def update_business_info_record(data: BusinessDataRes):
 
 # --- NOTIFICATION SETTINGS CRUD --- #
 @router.get("/notifications", response_model=NotificationSettings)
-async def get_notification_settings():
-    user_id = 1
+async def get_notification_settings(current_user : dict = Depends(get_current_user)):
+    user_id = current_user["user_id"]
     record = await fetch_notification_settings(user_id)
     if not record:
         raise HTTPException(status_code=404, detail="Notification settings not found")
     return record
 
 @router.put("/notifications", response_model=NotificationSettings)
-async def update_notification_settings(data: NotificationSettings):
-    user_id = 1
-
+async def update_notification_settings(data: NotificationSettings,
+                                       current_user : dict = Depends(get_current_user)
+                                       ):
+    
+    user_id = current_user["user_id"]
     existing = await Database.fetch_one(
         "SELECT id FROM user_settings WHERE user_id = ?", (user_id,)
     )
@@ -120,7 +129,33 @@ async def update_notification_settings(data: NotificationSettings):
 
     return await fetch_notification_settings(user_id)
 
+
+@router.put("/update_user_plan", response_model=BaseResponse)
+async def update_user_plan(
+    request: UpdateUserPlan,
+    current_user: dict = Depends(get_current_user)
+):
+    """Allow user to change plan type (no payment logic yet)."""
+    user_id = current_user["user_id"]
+
+    sql = """
+        UPDATE users
+        SET 
+            plan_type = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?;
+    """
+
+    try:
+        await Database.execute(sql, (request.plan_type, user_id))
+        return BaseResponse(success=True, message="Plan updated successfully")
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Failed to update plan: {str(e)}")
+    
+
 async def fetch_notification_settings(user_id) :
     record = await Database.fetch_one("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
+    if record is None:
+        return {} 
     settings = {k: v for k, v in record.items() if v is not None}
     return settings
