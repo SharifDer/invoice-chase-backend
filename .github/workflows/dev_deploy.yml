@@ -21,11 +21,16 @@ jobs:
           port: 2222
           script: |
             set -e
-            DEPLOY_DIR=/opt/invoicechase_dev # <-- 1. Set DEV directory
+            DEPLOY_DIR=/opt/invoicechase_dev
             BRANCH_TO_DEPLOY="${{ github.event.inputs.branch }}"
 
             echo "--- Deploying DEV branch: $BRANCH_TO_DEPLOY ---"
 
+            # --- GIT OWNERSHIP FIX ---
+            # Tell Git that the directory is safe to use, even as root
+            sudo git config --global --add safe.directory $DEPLOY_DIR
+
+            # 1. Ensure deploy dir exists and pull code
             mkdir -p $DEPLOY_DIR
             if [ ! -d "$DEPLOY_DIR/.git" ]; then
               git clone -b $BRANCH_TO_DEPLOY https://github.com/${{ github.repository }}.git $DEPLOY_DIR
@@ -35,17 +40,19 @@ jobs:
               git reset --hard origin/$BRANCH_TO_DEPLOY
             fi
 
+            # 2. Setup venv
             if [ ! -d "$DEPLOY_DIR/venv" ]; then
               python3.12 -m venv $DEPLOY_DIR/venv
             fi
 
+            # 3. Install requirements
             source $DEPLOY_DIR/venv/bin/activate
             pip install --upgrade pip
             pip install -r $DEPLOY_DIR/requirements.txt
 
+            # 4. Create DEV secret files
             mkdir -p $DEPLOY_DIR/keys
             
-            # Use DEV secrets
             cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
             ${{ secrets.DEV_FIREBASE_SERVICE_ACCOUNT_JSON }}
             EOF
@@ -53,8 +60,8 @@ jobs:
             ${{ secrets.DEV_API_KEYS_JSON }}
             EOF
 
-            # Set correct permissions
+            # 5. Set correct permissions for our app user
             sudo chown -R invoicechase_user:invoicechase_user $DEPLOY_DIR
 
-            # Restart the DEV service
-            sudo systemctl restart invoicechase_dev # <-- 2. Restart DEV service
+            # 6. Restart the DEV service
+            sudo systemctl restart invoicechase_dev
