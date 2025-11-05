@@ -1,0 +1,58 @@
+name: InvoiceChase Prod CI/CD
+
+on:
+  push:
+    branches:
+      - main # Triggers on push to main
+  workflow_dispatch: # Allows manual run for main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy PROD code to VPS
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 2222
+          script: |
+            set -e
+            DEPLOY_DIR=/opt/invoicechase_prod # <-- 1. Set PROD directory
+            BRANCH_TO_DEPLOY="main"
+
+            echo "--- Deploying PROD branch: $BRANCH_TO_DEPLOY ---"
+
+            mkdir -p $DEPLOY_DIR
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              git clone -b $BRANCH_TO_DEPLOY https://github.com/${{ github.repository }}.git $DEPLOY_DIR
+            else
+              cd $DEPLOY_DIR
+              git fetch origin
+              git reset --hard origin/$BRANCH_TO_DEPLOY
+            fi
+
+            if [ ! -d "$DEPLOY_DIR/venv" ]; then
+              python3.12 -m venv $DEPLOY_DIR/venv
+            fi
+
+            source $DEPLOY_DIR/venv/bin/activate
+            pip install --upgrade pip
+            pip install -r $DEPLOY_DIR/requirements.txt
+
+            mkdir -p $DEPLOY_DIR/keys
+            
+            # Use PROD secrets
+            cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
+            ${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_JSON }}
+            EOF
+            cat <<'EOF' > $DEPLOY_DIR/keys/keys.json
+            ${{ secrets.PROD_API_KEYS_JSON }}
+            EOF
+
+            # Set correct permissions
+            sudo chown -R invoicechase_user:invoicechase_user $DEPLOY_DIR
+
+            # Restart the PROD service
+            sudo systemctl restart invoicechase_prod # <-- 2. Restart PROD service
