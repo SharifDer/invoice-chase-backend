@@ -1,18 +1,16 @@
-name: InvoiceChase Dev CI/CD
+name: InvoiceChase Prod CI/CD
 
 on:
-  workflow_dispatch: # Only manual trigger for dev
-    inputs:
-      branch:
-        description: 'Branch to deploy'
-        default: 'dev'
-        required: true
+  push:
+    branches:
+      - main # Automatically deploy on push to main
+  workflow_dispatch: # Allow manual run for main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy DEV code to VPS
+      - name: Deploy PROD code to VPS
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -21,10 +19,10 @@ jobs:
           port: 2222
           script: |
             set -e
-            DEPLOY_DIR=/opt/invoicechase_dev
-            BRANCH_TO_DEPLOY="${{ github.event.inputs.branch }}"
+            DEPLOY_DIR=/opt/invoicechase_prod
+            BRANCH_TO_DEPLOY="main"
 
-            echo "--- Deploying DEV branch: $BRANCH_TO_DEPLOY ---"
+            echo "--- Deploying PROD branch: $BRANCH_TO_DEPLOY ---"
 
             # --- GIT OWNERSHIP FIX ---
             # Tell Git that the directory is safe to use, even as root
@@ -50,18 +48,18 @@ jobs:
             pip install --upgrade pip
             pip install -r $DEPLOY_DIR/requirements.txt
 
-            # 4. Create DEV secret files
+            # 4. Create PROD secret files
             mkdir -p $DEPLOY_DIR/keys
             
             cat <<'EOF' > $DEPLOY_DIR/keys/firebase.json
-            ${{ secrets.DEV_FIREBASE_SERVICE_ACCOUNT_JSON }}
+            ${{ secrets.PROD_FIREBASE_SERVICE_ACCOUNT_JSON }}
             EOF
             cat <<'EOF' > $DEPLOY_DIR/keys/keys.json
-            ${{ secrets.DEV_API_KEYS_JSON }}
+            ${{ secrets.PROD_API_KEYS_JSON }}
             EOF
 
             # 5. Set correct permissions for our app user
             sudo chown -R invoicechase_user:invoicechase_user $DEPLOY_DIR
 
-            # 6. Restart the DEV service
-            sudo systemctl restart invoicechase_dev
+            # 6. Restart the PROD service
+            sudo systemctl restart invoicechase_prod
