@@ -40,7 +40,9 @@ async def _get_or_create_user(uid: str, email: str,
             (email_verified, uid)
         )
         background.add_task(welcome_email_task , name , email)
-        logger.info(f"Welcome email is being sent to this email : {email}")        
+        if email_verified:
+            background.add_task(welcome_email_task, name, email)
+            logger.info(f"Welcome email is being sent to this email : {email}")        
     return user
 
 
